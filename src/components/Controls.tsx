@@ -1,19 +1,28 @@
-import { Mic, PhoneOff, Hand } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Hand } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface ControlsProps {
     isConnected: boolean;
+    isMuted: boolean;
     onStart: () => void;
     onEnd: () => void;
-    onMute?: () => void;
+    onToggleMute: () => void;
+    onInterrupt: () => void;
 }
 
-export const Controls = ({ isConnected, onStart, onEnd }: ControlsProps) => {
+export const Controls = ({
+    isConnected,
+    isMuted,
+    onStart,
+    onEnd,
+    onToggleMute,
+    onInterrupt
+}: ControlsProps) => {
     return (
         <div className="glass-panel px-8 py-4 rounded-2xl neon-border flex items-center space-x-8 transform transition-transform hover:-translate-y-1 duration-300">
             {/* Mute/Start Button */}
             <button
-                onClick={!isConnected ? onStart : undefined}
+                onClick={!isConnected ? onStart : onToggleMute}
                 className="group flex flex-col items-center gap-1 focus:outline-none"
             >
                 <motion.div
@@ -22,20 +31,27 @@ export const Controls = ({ isConnected, onStart, onEnd }: ControlsProps) => {
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-[0_0_10px_rgba(0,238,255,0.1)] 
                 ${!isConnected
                             ? "bg-primary text-background-dark shadow-[0_0_20px_rgba(0,238,255,0.6)]"
-                            : "bg-background-dark border border-primary/30 text-primary hover:bg-primary hover:text-background-dark hover:shadow-[0_0_20px_rgba(0,238,255,0.6)]"}`}
+                            : isMuted
+                                ? "bg-red-500/20 border border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                                : "bg-background-dark border border-primary/30 text-primary hover:bg-primary hover:text-background-dark hover:shadow-[0_0_20px_rgba(0,238,255,0.6)]"}`}
                 >
-                    {isConnected ? <Mic size={20} /> : <Mic size={24} className="animate-pulse" />}
+                    {isConnected ? (isMuted ? <MicOff size={20} /> : <Mic size={20} />) : <Mic size={24} className="animate-pulse" />}
                 </motion.div>
-                <span className="text-[10px] font-mono text-primary/50 group-hover:text-primary tracking-wider uppercase">
-                    {!isConnected ? "Start" : "Mute"}
+                <span className={`text-[10px] font-mono tracking-wider uppercase ${isMuted ? "text-red-500" : "text-primary/50 group-hover:text-primary"}`}>
+                    {!isConnected ? "Start" : (isMuted ? "Unmute" : "Mute")}
                 </span>
             </button>
 
             {/* Interrupt Button */}
             {isConnected && (
-                <button className="group flex flex-col items-center gap-1 focus:outline-none cursor-not-allowed opacity-50">
+                <button
+                    onClick={onInterrupt}
+                    className="group flex flex-col items-center gap-1 focus:outline-none"
+                >
                     <motion.div
-                        className="w-14 h-14 rounded-full bg-primary/10 border border-primary flex items-center justify-center text-primary shadow-[0_0_15px_rgba(0,238,255,0.3)]"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className="w-14 h-14 rounded-full bg-primary/10 border border-primary flex items-center justify-center text-primary shadow-[0_0_15px_rgba(0,238,255,0.3)] hover:bg-primary hover:text-background-dark transition-all duration-300"
                     >
                         <Hand size={28} />
                     </motion.div>

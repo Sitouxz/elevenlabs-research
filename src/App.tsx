@@ -11,10 +11,13 @@ function App() {
     isConnected,
     isSpeaking,
     isListening,
+    isMuted,
     messages,
     stream,
     startConversation,
-    endConversation
+    endConversation,
+    toggleMute,
+    interrupt
   } = useElevenLabs(AGENT_ID);
 
   return (
@@ -107,8 +110,11 @@ function App() {
           <div className="w-full md:w-auto flex justify-center mb-6 md:mb-0">
             <Controls
               isConnected={isConnected}
+              isMuted={isMuted}
               onStart={startConversation}
               onEnd={endConversation}
+              onToggleMute={toggleMute}
+              onInterrupt={interrupt}
             />
           </div>
 
