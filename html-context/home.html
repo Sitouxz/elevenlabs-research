@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Jarvis Voice AI Interface</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Config -->
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00eeff",
+                        "background-light": "#f5f8f8",
+                        "background-dark": "#0f2223",
+                        "midnight": "#050b0c",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"],
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+                    animation: {
+                        'spin-slow': 'spin 12s linear infinite',
+                        'spin-reverse-slow': 'spin 15s linear infinite reverse',
+                        'pulse-glow': 'pulse-glow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'wave': 'wave 1.5s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        'pulse-glow': {
+                            '0%, 100%': { opacity: '0.6', transform: 'scale(1)' },
+                            '50%': { opacity: '1', transform: 'scale(1.05)' },
+                        },
+                        'wave': {
+                            '0%, 100%': { height: '10%' },
+                            '50%': { height: '60%' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom Styles for Glow Effects */
+        .neon-text {
+            text-shadow: 0 0 10px rgba(0, 238, 255, 0.7);
+        }
+
+        .neon-border {
+            box-shadow: 0 0 15px rgba(0, 238, 255, 0.2), inset 0 0 10px rgba(0, 238, 255, 0.1);
+        }
+
+        .orb-core {
+            background: radial-gradient(circle, rgba(0, 238, 255, 0.4) 0%, rgba(0, 238, 255, 0) 70%);
+            box-shadow: 0 0 60px rgba(0, 238, 255, 0.3);
+        }
+
+        .glass-panel {
+            background: rgba(15, 34, 35, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 238, 255, 0.15);
+        }
+
+        /* Grid Background Pattern */
+        .bg-grid {
+            background-size: 50px 50px;
+            background-image:
+                linear-gradient(to right, rgba(0, 238, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 238, 255, 0.03) 1px, transparent 1px);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-midnight font-display text-gray-200 h-screen w-full overflow-hidden relative selection:bg-primary selection:text-black">
+    <!-- Background Grid Texture -->
+    <div class="absolute inset-0 bg-grid pointer-events-none z-0"></div>
+    <!-- Ambient Glow Spots -->
+    <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none z-0"></div>
+    <div
+        class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none z-0">
+    </div>
+    <!-- Main Container -->
+    <div class="relative z-10 h-full flex flex-col justify-between p-6 md:p-10">
+        <!-- Top Header Area -->
+        <header class="flex justify-between items-start">
+            <!-- System Monitor Widget -->
+            <div class="glass-panel p-4 rounded-xl w-72 transition-all hover:border-primary/40 group">
+                <div class="flex items-center space-x-2 mb-3 border-b border-primary/10 pb-2">
+                    <span class="material-icons-round text-primary text-sm animate-pulse">data_usage</span>
+                    <h2 class="text-xs font-mono font-bold tracking-widest text-primary/80">SYSTEM MONITOR</h2>
+                </div>
+                <div class="space-y-2 font-mono text-xs">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">STATUS</span>
+                        <span class="text-green-400 font-bold flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                            ONLINE
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">LATENCY</span>
+                        <span class="text-primary">24ms</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">VOICE_ID</span>
+                        <span class="text-gray-300">EL_ADAM_V2</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-gray-400">CPU LOAD</span>
+                        <div class="w-20 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary w-[35%] shadow-[0_0_10px_rgba(0,238,255,0.8)]"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Decorative lines -->
+                <div
+                    class="absolute -top-1 -left-1 w-3 h-3 border-t border-l border-primary opacity-50 group-hover:opacity-100 transition-opacity">
+                </div>
+                <div
+                    class="absolute -bottom-1 -right-1 w-3 h-3 border-b border-r border-primary opacity-50 group-hover:opacity-100 transition-opacity">
+                </div>
+            </div>
+            <!-- Top Right: Connection Indicator -->
+            <div class="glass-panel px-4 py-2 rounded-full flex items-center space-x-3">
+                <div class="flex space-x-1 items-end h-4">
+                    <div class="w-1 bg-primary/80 h-2 rounded-sm animate-pulse"></div>
+                    <div class="w-1 bg-primary/80 h-3 rounded-sm animate-pulse" style="animation-delay: 0.1s"></div>
+                    <div class="w-1 bg-primary/80 h-4 rounded-sm animate-pulse" style="animation-delay: 0.2s"></div>
+                </div>
+                <span class="text-xs font-mono text-primary tracking-wider">SECURE CONNECTION</span>
+            </div>
+        </header>
+        <!-- Center Stage: The AI Visualizer -->
+        <main class="flex-grow flex flex-col items-center justify-center relative">
+            <!-- Orbiting Rings Container -->
+            <div class="relative w-80 h-80 md:w-96 md:h-96 flex items-center justify-center">
+                <!-- Outer Ring -->
+                <div class="absolute inset-0 border border-primary/20 rounded-full animate-spin-slow border-dashed">
+                </div>
+                <!-- Middle Ring -->
+                <div
+                    class="absolute inset-8 border border-primary/30 rounded-full animate-spin-reverse-slow border-t-transparent border-l-transparent">
+                </div>
+                <!-- Inner Ring -->
+                <div class="absolute inset-16 border-2 border-primary/10 rounded-full"></div>
+                <!-- Core Glow -->
+                <div class="absolute inset-0 rounded-full orb-core animate-pulse-glow"></div>
+                <!-- Waveform Visualization -->
+                <div class="relative z-10 flex items-center justify-center space-x-1 h-16">
+                    <div
+                        class="w-1.5 bg-primary rounded-full animate-[wave_1.2s_ease-in-out_infinite] h-8 shadow-[0_0_10px_#00eeff]">
+                    </div>
+                    <div
+                        class="w-1.5 bg-primary rounded-full animate-[wave_1.1s_ease-in-out_infinite_0.1s] h-12 shadow-[0_0_10px_#00eeff]">
+                    </div>
+                    <div
+                        class="w-1.5 bg-primary rounded-full animate-[wave_1.0s_ease-in-out_infinite_0.2s] h-6 shadow-[0_0_10px_#00eeff]">
+                    </div>
+                    <div
+                        class="w-1.5 bg-primary rounded-full animate-[wave_0.9s_ease-in-out_infinite_0.1s] h-10 shadow-[0_0_10px_#00eeff]">
+                    </div>
+                    <div
+                        class="w-1.5 bg-primary rounded-full animate-[wave_1.3s_ease-in-out_infinite] h-5 shadow-[0_0_10px_#00eeff]">
+                    </div>
+                </div>
+                <!-- Floating Particles (Abstract) -->
+                <div class="absolute inset-0 w-full h-full animate-spin-slow" style="animation-duration: 20s;">
+                    <div class="absolute top-0 left-1/2 w-1 h-1 bg-primary rounded-full shadow-[0_0_5px_#00eeff]"></div>
+                    <div class="absolute bottom-10 right-10 w-1.5 h-1.5 bg-primary/50 rounded-full"></div>
+                </div>
+            </div>
+            <!-- AI Status Text -->
+            <div class="mt-8 text-center">
+                <h1 class="text-3xl md:text-4xl font-light tracking-tight text-white neon-text mb-2">JARVIS</h1>
+                <p class="text-primary/60 font-mono text-sm tracking-[0.3em] uppercase animate-pulse">Listening...</p>
+            </div>
+        </main>
+        <!-- Bottom Interface Layer -->
+        <footer class="relative flex flex-col md:flex-row items-end justify-between w-full">
+            <!-- Left Placeholder (Balance) -->
+            <div class="hidden md:block w-1/4"></div>
+            <!-- Center Control Dock -->
+            <div class="w-full md:w-auto flex justify-center mb-6 md:mb-0">
+                <div
+                    class="glass-panel px-8 py-4 rounded-2xl neon-border flex items-center space-x-8 transform transition-transform hover:-translate-y-1 duration-300">
+                    <!-- Mute Button -->
+                    <button class="group flex flex-col items-center gap-1 focus:outline-none">
+                        <div
+                            class="w-12 h-12 rounded-full bg-background-dark border border-primary/30 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-background-dark transition-all duration-300 shadow-[0_0_10px_rgba(0,238,255,0.1)] group-hover:shadow-[0_0_20px_rgba(0,238,255,0.6)]">
+                            <span class="material-icons-round">mic</span>
+                        </div>
+                        <span
+                            class="text-[10px] font-mono text-primary/50 group-hover:text-primary tracking-wider uppercase">Mute</span>
+                    </button>
+                    <!-- Interrupt Button -->
+                    <button class="group flex flex-col items-center gap-1 focus:outline-none">
+                        <div
+                            class="w-14 h-14 rounded-full bg-primary/10 border border-primary flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-background-dark transition-all duration-300 shadow-[0_0_15px_rgba(0,238,255,0.3)] group-hover:shadow-[0_0_25px_rgba(0,238,255,0.8)]">
+                            <span class="material-icons-round text-3xl">back_hand</span>
+                        </div>
+                        <span
+                            class="text-[10px] font-mono text-primary group-hover:text-primary tracking-wider uppercase font-bold">Interrupt</span>
+                    </button>
+                    <!-- End Call Button -->
+                    <button class="group flex flex-col items-center gap-1 focus:outline-none">
+                        <div
+                            class="w-12 h-12 rounded-full bg-background-dark border border-red-500/30 flex items-center justify-center text-red-500 group-hover:bg-red-500 group-hover:text-white transition-all duration-300 shadow-[0_0_10px_rgba(239,68,68,0.1)] group-hover:shadow-[0_0_20px_rgba(239,68,68,0.6)]">
+                            <span class="material-icons-round">call_end</span>
+                        </div>
+                        <span
+                            class="text-[10px] font-mono text-red-500/50 group-hover:text-red-500 tracking-wider uppercase">End</span>
+                    </button>
+                </div>
+            </div>
+            <!-- Right Transcript Panel -->
+            <div class="w-full md:w-1/4 h-64 md:h-auto flex justify-end">
+                <div
+                    class="glass-panel w-full rounded-tl-xl rounded-tr-xl md:rounded-xl p-5 relative overflow-hidden flex flex-col justify-end min-h-[250px] border-b-0 md:border-b">
+                    <!-- Fade out gradient at top -->
+                    <div
+                        class="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#0f2223]/90 to-transparent z-10 pointer-events-none">
+                    </div>
+                    <!-- Header -->
+                    <div class="absolute top-0 right-0 p-3 z-20">
+                        <div
+                            class="text-[10px] font-mono text-primary/40 border border-primary/20 px-2 py-0.5 rounded uppercase">
+                            Transcript</div>
+                    </div>
+                    <!-- Messages -->
+                    <div class="space-y-4 relative z-0 mt-8">
+                        <!-- AI Message -->
+                        <div class="flex flex-col items-start opacity-40">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="w-1.5 h-1.5 bg-primary rounded-full"></span>
+                                <span class="text-[10px] font-mono text-primary/70 uppercase">Jarvis</span>
+                            </div>
+                            <p
+                                class="text-sm text-gray-300 font-light leading-relaxed pl-3.5 border-l border-primary/10">
+                                System initialized. I am ready to process your request.
+                            </p>
+                        </div>
+                        <!-- User Message -->
+                        <div class="flex flex-col items-end opacity-60">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[10px] font-mono text-white/70 uppercase">You</span>
+                            </div>
+                            <p
+                                class="text-sm text-white font-light leading-relaxed pr-3.5 border-r border-white/10 text-right">
+                                Can you analyze the recent server logs for anomalies?
+                            </p>
+                        </div>
+                        <!-- AI Message (Active) -->
+                        <div class="flex flex-col items-start animate-[pulse-glow_4s_infinite]">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_5px_#00eeff]"></span>
+                                <span class="text-[10px] font-mono text-primary uppercase">Jarvis</span>
+                            </div>
+                            <p
+                                class="text-sm text-gray-100 font-normal leading-relaxed pl-3.5 border-l-2 border-primary">
+                                Certainly. Accessing server logs now. I've detected a latency spike in the US-East
+                                region approximately 4 minutes ago. Would you like a detailed breakdown?
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+
+</html>
