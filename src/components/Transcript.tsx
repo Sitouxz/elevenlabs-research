@@ -26,7 +26,7 @@ export const Transcript = ({ messages }: TranscriptProps) => {
     }, [messages]);
 
     return (
-        <div className="glass-panel w-full rounded-tl-xl rounded-tr-xl md:rounded-xl p-5 relative overflow-hidden flex flex-col min-h-[250px] border-b-0 md:border-b">
+        <div className="glass-panel w-full rounded-tl-xl rounded-tr-xl md:rounded-xl p-4 md:p-5 relative overflow-hidden flex flex-col min-h-[150px] md:min-h-[250px] border-b-0 md:border-b">
             {/* Fade out gradient at top */}
             <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background-dark/90 to-transparent z-10 pointer-events-none" />
 
@@ -40,7 +40,7 @@ export const Transcript = ({ messages }: TranscriptProps) => {
             {/* Messages */}
             <div
                 ref={scrollRef}
-                className="space-y-4 relative z-0 mt-8 overflow-y-auto max-h-[200px] scrollbar-hide flex-grow pb-4"
+                className="space-y-4 relative z-0 mt-8 overflow-y-auto max-h-[120px] md:max-h-[200px] scrollbar-hide flex-grow pb-4"
             >
                 <AnimatePresence>
                     {messages.length === 0 && (

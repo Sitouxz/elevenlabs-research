@@ -21,7 +21,7 @@ function App() {
   } = useElevenLabs(AGENT_ID);
 
   return (
-    <div className="bg-midnight font-display text-gray-200 h-screen w-full overflow-hidden relative selection:bg-primary selection:text-black">
+    <div className="bg-midnight font-display text-gray-200 min-h-screen md:h-screen w-full overflow-x-hidden overflow-y-auto md:overflow-hidden relative selection:bg-primary selection:text-black">
       {/* Background Grid Texture */}
       <div className="absolute inset-0 bg-grid pointer-events-none z-0"></div>
 
@@ -30,7 +30,7 @@ function App() {
       <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
       {/* Main Container */}
-      <div className="relative z-10 h-full flex flex-col justify-between p-6 md:p-10">
+      <div className="relative z-10 min-h-screen md:h-full flex flex-col p-4 md:p-10 pb-48 md:pb-10">
         {/* Top Header Area */}
         <header className="flex justify-between items-start">
           {/* System Monitor Widget */}
@@ -102,12 +102,9 @@ function App() {
         </main>
 
         {/* Bottom Interface Layer */}
-        <footer className="relative flex flex-col md:flex-row items-end justify-between w-full">
-          {/* Space for layout balance */}
+        <footer className="fixed bottom-0 left-0 w-full z-20 flex flex-col md:flex-row items-end justify-between p-4 md:p-10 pointer-events-none">
           <div className="hidden md:block w-1/4"></div>
-
-          {/* Center Control Dock */}
-          <div className="w-full md:w-auto flex justify-center mb-6 md:mb-0">
+          <div className="w-full md:w-auto flex justify-center mb-4 md:mb-0 pointer-events-auto">
             <Controls
               isConnected={isConnected}
               isMuted={isMuted}
@@ -117,9 +114,7 @@ function App() {
               onInterrupt={interrupt}
             />
           </div>
-
-          {/* Right Transcript Panel */}
-          <div className="w-full md:w-[30%] lg:w-1/4 flex justify-end">
+          <div className="w-full md:w-[30%] lg:w-1/4 flex justify-end pointer-events-auto">
             <Transcript messages={messages} />
           </div>
         </footer>

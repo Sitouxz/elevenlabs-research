@@ -19,7 +19,7 @@ export const Controls = ({
     onInterrupt
 }: ControlsProps) => {
     return (
-        <div className="glass-panel px-8 py-4 rounded-2xl neon-border flex items-center space-x-8 transform transition-transform hover:-translate-y-1 duration-300">
+        <div className="glass-panel px-4 py-3 sm:px-8 sm:py-4 rounded-2xl neon-border flex items-center space-x-4 sm:space-x-8 transform transition-transform hover:-translate-y-1 duration-300">
             {/* Mute/Start Button */}
             <button
                 onClick={!isConnected ? onStart : onToggleMute}

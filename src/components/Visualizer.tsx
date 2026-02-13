@@ -59,7 +59,7 @@ export const Visualizer = ({ isSpeaking, isListening, audioStream }: VisualizerP
   const activeLevel = audioLevel || (isSpeaking ? 0.4 + Math.sin(Date.now() / 200) * 0.2 : 0);
 
   return (
-    <div className="relative w-80 h-80 md:w-96 md:h-96 flex items-center justify-center">
+    <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 flex items-center justify-center">
       {/* Outer Ring */}
       <motion.div
         className="absolute inset-0 border border-primary/20 rounded-full border-dashed"
