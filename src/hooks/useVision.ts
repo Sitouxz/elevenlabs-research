@@ -1,256 +1,223 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import * as tf from "@tensorflow/tfjs";
-import * as cocoSsd from "@tensorflow-models/coco-ssd";
-import * as mobilenet from "@tensorflow-models/mobilenet";
-import Tesseract from "tesseract.js";
 
-export interface Detection {
-    label: string;
-    score: number;
-    bbox: [number, number, number, number]; // [x, y, width, height]
-}
+// ---------------------------------------------------------------------------
+// Configuration — follows the OpenAI Vision API pattern from
+// https://github.com/roboflow/awesome-openai-vision-api-experiments
+//
+// Default: Groq free tier (OpenAI-compatible, 30 RPM free)
+//   - Get a free key at https://console.groq.com
+//   - Model: meta-llama/llama-4-scout-17b-16e-instruct (vision-capable)
+//
+// You can also point this at OpenAI, OpenRouter, Together, etc.
+// ---------------------------------------------------------------------------
+const VISION_API_KEY = import.meta.env.VITE_VISION_API_KEY || "";
+const VISION_BASE_URL =
+    import.meta.env.VITE_VISION_BASE_URL ||
+    "https://api.groq.com/openai/v1";
+const VISION_MODEL =
+    import.meta.env.VITE_VISION_MODEL ||
+    "meta-llama/llama-4-scout-17b-16e-instruct";
 
-export interface Classification {
-    className: string;
-    probability: number;
-}
+const DEFAULT_INTERVAL_MS = 10_000; // 10s between analyses
+const MAX_BACKOFF_MS = 120_000;
+
+const VISION_PROMPT =
+    "You are an AI vision system feeding real-time descriptions to a voice " +
+    "assistant called JARVIS. Analyze this camera frame and provide a concise, " +
+    "natural description of what you see.\n\n" +
+    "Include:\n" +
+    "- Objects and their approximate positions/relationships\n" +
+    "- Any text or labels visible (OCR)\n" +
+    "- People and what they appear to be doing (if any)\n" +
+    "- Notable colors, brands, or distinguishing features\n" +
+    "- Context about the scene/environment\n\n" +
+    "Keep the description under 3 sentences. Be specific and factual. " +
+    'Do NOT say "I see an image" or "This is a photo" — describe the ' +
+    "contents directly as if you are looking through a camera in real time.";
 
 export interface VisionResult {
-    detections: Detection[];
-    classifications: Classification[];
     description: string;
     timestamp: number;
 }
 
 export const useVision = () => {
-    const [isModelLoading, setIsModelLoading] = useState(false);
-    const [isModelReady, setIsModelReady] = useState(false);
+    const [isReady, setIsReady] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [isOcrRunning, setIsOcrRunning] = useState(false);
     const [lastResult, setLastResult] = useState<VisionResult | null>(null);
-    const [ocrText, setOcrText] = useState<string>("");
-    const [objectCount, setObjectCount] = useState(0);
+    const [error, setError] = useState<string>("");
 
-    const cocoModelRef = useRef<cocoSsd.ObjectDetection | null>(null);
-    const mobilenetModelRef = useRef<mobilenet.MobileNet | null>(null);
     const lastDescriptionRef = useRef<string>("");
     const analysisLoopRef = useRef<number | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const backoffMsRef = useRef(0);
+    const consecutiveErrorsRef = useRef(0);
 
-    const loadModels = useCallback(async () => {
-        if (isModelReady || isModelLoading) return;
-        setIsModelLoading(true);
-
-        try {
-            await tf.ready();
-            const [cocoModel, mobileModel] = await Promise.all([
-                cocoSsd.load({ base: "lite_mobilenet_v2" }),
-                mobilenet.load({ version: 2, alpha: 0.5 }),
-            ]);
-            cocoModelRef.current = cocoModel;
-            mobilenetModelRef.current = mobileModel;
-            setIsModelReady(true);
-            console.log("Vision models loaded successfully");
-        } catch (error) {
-            console.error("Failed to load vision models:", error);
-        } finally {
-            setIsModelLoading(false);
+    // Ready when we have an API key
+    useEffect(() => {
+        if (VISION_API_KEY) {
+            setIsReady(true);
+            console.log(
+                `Vision ready — model: ${VISION_MODEL}, provider: ${VISION_BASE_URL}`
+            );
+        } else {
+            setError("Missing VITE_VISION_API_KEY in environment variables");
         }
-    }, [isModelReady, isModelLoading]);
-
-    const unloadModels = useCallback(() => {
-        cocoModelRef.current = null;
-        mobilenetModelRef.current = null;
-        setIsModelReady(false);
-        setLastResult(null);
-        setObjectCount(0);
-        lastDescriptionRef.current = "";
     }, []);
 
-    const detectObjects = useCallback(
-        async (
-            source: HTMLVideoElement | HTMLCanvasElement
-        ): Promise<Detection[]> => {
-            if (!cocoModelRef.current) return [];
+    // -----------------------------------------------------------------------
+    // Capture a video frame as base64 JPEG  (same pattern as webcam-gpt repo)
+    // -----------------------------------------------------------------------
+    const captureFrameAsBase64 = useCallback(
+        (video: HTMLVideoElement): string | null => {
             try {
-                const predictions = await cocoModelRef.current.detect(source);
-                return predictions.map((p) => ({
-                    label: p.class,
-                    score: p.score,
-                    bbox: p.bbox as [number, number, number, number],
-                }));
+                const canvas = document.createElement("canvas");
+                const scale = Math.min(1, 640 / (video.videoWidth || 640));
+                canvas.width = (video.videoWidth || 640) * scale;
+                canvas.height = (video.videoHeight || 480) * scale;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return null;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                return dataUrl.split(",")[1];
             } catch {
-                return [];
+                return null;
             }
         },
         []
     );
 
-    const classifyImage = useCallback(
-        async (
-            source: HTMLVideoElement | HTMLCanvasElement
-        ): Promise<Classification[]> => {
-            if (!mobilenetModelRef.current) return [];
-            try {
-                const predictions =
-                    await mobilenetModelRef.current.classify(source);
-                return predictions.map((p) => ({
-                    className: p.className,
-                    probability: p.probability,
-                }));
-            } catch {
-                return [];
-            }
-        },
-        []
-    );
-
-    const recognizeText = useCallback(
-        async (source: HTMLCanvasElement): Promise<string> => {
-            setIsOcrRunning(true);
-            try {
-                const result = await Tesseract.recognize(source, "eng");
-                const text = result.data.text.trim();
-                setOcrText(text);
-                return text;
-            } catch (error) {
-                console.error("OCR failed:", error);
-                return "";
-            } finally {
-                setIsOcrRunning(false);
-            }
-        },
-        []
-    );
-
-    const composeDescription = useCallback(
-        (
-            detections: Detection[],
-            classifications: Classification[],
-            ocrResult?: string
-        ): string => {
-            const parts: string[] = [];
-
-            // Group and count detected objects
-            if (detections.length > 0) {
-                const objectCounts: Record<string, number> = {};
-                for (const d of detections) {
-                    if (d.score > 0.5) {
-                        objectCounts[d.label] =
-                            (objectCounts[d.label] || 0) + 1;
-                    }
-                }
-                const objectList = Object.entries(objectCounts)
-                    .map(([label, count]) =>
-                        count > 1 ? `${count} ${label}s` : `a ${label}`
-                    )
-                    .join(", ");
-                if (objectList) {
-                    parts.push(`I can see ${objectList}`);
-                }
-            }
-
-            // Top classification
-            if (classifications.length > 0 && classifications[0].probability > 0.3) {
-                const topClass = classifications[0].className
-                    .split(",")[0]
-                    .trim();
-                parts.push(`The scene appears to contain: ${topClass}`);
-            }
-
-            // OCR text
-            if (ocrResult && ocrResult.length > 2) {
-                parts.push(`Detected text: "${ocrResult.substring(0, 200)}"`);
-            }
-
-            if (parts.length === 0) {
-                return "No significant objects detected in view.";
-            }
-
-            return parts.join(". ") + ".";
-        },
-        []
-    );
-
+    // -----------------------------------------------------------------------
+    // Send frame to vision API — OpenAI chat/completions format with image_url
+    // (same payload structure as roboflow/awesome-openai-vision-api-experiments)
+    // -----------------------------------------------------------------------
     const analyzeFrame = useCallback(
-        async (
-            source: HTMLVideoElement | HTMLCanvasElement,
-            includeOcr = false
-        ): Promise<VisionResult | null> => {
-            if (!isModelReady || isAnalyzing) return null;
+        async (video: HTMLVideoElement): Promise<VisionResult | null> => {
+            if (!isReady || isAnalyzing) return null;
+
+            const base64 = captureFrameAsBase64(video);
+            if (!base64) return null;
+
             setIsAnalyzing(true);
+            setError("");
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            abortControllerRef.current = new AbortController();
 
             try {
-                const [detections, classifications] = await Promise.all([
-                    detectObjects(source),
-                    classifyImage(source),
-                ]);
+                // OpenAI-compatible chat completions payload with image_url
+                const payload = {
+                    model: VISION_MODEL,
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: VISION_PROMPT,
+                                },
+                                {
+                                    type: "image_url",
+                                    image_url: {
+                                        url: `data:image/jpeg;base64,${base64}`,
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                    max_tokens: 300,
+                    temperature: 0.3,
+                };
 
-                let ocrResult: string | undefined;
-                if (includeOcr && source instanceof HTMLCanvasElement) {
-                    ocrResult = await recognizeText(source);
+                const response = await fetch(
+                    `${VISION_BASE_URL}/chat/completions`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${VISION_API_KEY}`,
+                        },
+                        signal: abortControllerRef.current.signal,
+                        body: JSON.stringify(payload),
+                    }
+                );
+
+                if (!response.ok) {
+                    const errBody = await response.text();
+
+                    if (response.status === 429) {
+                        consecutiveErrorsRef.current += 1;
+                        backoffMsRef.current = Math.min(
+                            MAX_BACKOFF_MS,
+                            15_000 *
+                                Math.pow(
+                                    2,
+                                    consecutiveErrorsRef.current - 1
+                                )
+                        );
+                        const waitSec = Math.round(
+                            backoffMsRef.current / 1000
+                        );
+                        console.warn(
+                            `Vision API rate limited. Backing off ${waitSec}s`
+                        );
+                        setError(`Rate limited — retrying in ${waitSec}s`);
+                        return null;
+                    }
+
+                    console.error(
+                        "Vision API error:",
+                        response.status,
+                        errBody
+                    );
+                    setError(`API error: ${response.status}`);
+                    return null;
                 }
 
-                const description = composeDescription(
-                    detections,
-                    classifications,
-                    ocrResult
-                );
+                // Parse OpenAI-compatible response
+                const data = await response.json();
+                const description =
+                    data?.choices?.[0]?.message?.content?.trim() || "";
+
+                if (!description) return null;
+
                 const result: VisionResult = {
-                    detections,
-                    classifications,
                     description,
                     timestamp: Date.now(),
                 };
 
-                setLastResult(result);
-                setObjectCount(
-                    detections.filter((d) => d.score > 0.5).length
-                );
+                // Reset backoff on success
+                consecutiveErrorsRef.current = 0;
+                backoffMsRef.current = 0;
+                setError("");
 
+                setLastResult(result);
                 return result;
-            } catch (error) {
-                console.error("Frame analysis failed:", error);
+            } catch (err: any) {
+                if (err.name !== "AbortError") {
+                    console.error("Vision analysis failed:", err);
+                    setError(err.message || "Analysis failed");
+                }
                 return null;
             } finally {
                 setIsAnalyzing(false);
             }
         },
-        [
-            isModelReady,
-            isAnalyzing,
-            detectObjects,
-            classifyImage,
-            recognizeText,
-            composeDescription,
-        ]
-    );
-
-    const hasSceneChanged = useCallback(
-        (newDescription: string): boolean => {
-            if (!lastDescriptionRef.current) return true;
-            // Simple change detection: compare descriptions
-            const changed =
-                newDescription !== lastDescriptionRef.current &&
-                newDescription !== "No significant objects detected in view.";
-            if (changed) {
-                lastDescriptionRef.current = newDescription;
-            }
-            return changed;
-        },
-        []
+        [isReady, isAnalyzing, captureFrameAsBase64]
     );
 
     const startAnalysisLoop = useCallback(
         (
-            getSource: () => HTMLVideoElement | null,
+            getVideo: () => HTMLVideoElement | null,
             onUpdate: (description: string) => void,
-            intervalMs = 2000
+            intervalMs = DEFAULT_INTERVAL_MS
         ) => {
             if (analysisLoopRef.current) return;
 
             const loop = async () => {
-                const source = getSource();
-                if (!source || !isModelReady) {
+                const video = getVideo();
+                if (!video || !isReady) {
                     analysisLoopRef.current = window.setTimeout(
                         loop,
                         intervalMs
@@ -258,26 +225,36 @@ export const useVision = () => {
                     return;
                 }
 
-                const result = await analyzeFrame(source);
-                if (result && hasSceneChanged(result.description)) {
+                const result = await analyzeFrame(video);
+                if (
+                    result &&
+                    result.description !== lastDescriptionRef.current
+                ) {
+                    lastDescriptionRef.current = result.description;
                     onUpdate(result.description);
                 }
 
-                analysisLoopRef.current = window.setTimeout(
-                    loop,
-                    intervalMs
-                );
+                const nextDelay =
+                    backoffMsRef.current > 0
+                        ? backoffMsRef.current
+                        : intervalMs;
+
+                analysisLoopRef.current = window.setTimeout(loop, nextDelay);
             };
 
             loop();
         },
-        [isModelReady, analyzeFrame, hasSceneChanged]
+        [isReady, analyzeFrame]
     );
 
     const stopAnalysisLoop = useCallback(() => {
         if (analysisLoopRef.current) {
             clearTimeout(analysisLoopRef.current);
             analysisLoopRef.current = null;
+        }
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
         }
     }, []);
 
@@ -289,20 +266,12 @@ export const useVision = () => {
     }, [stopAnalysisLoop]);
 
     return {
-        isModelLoading,
-        isModelReady,
+        isReady,
         isAnalyzing,
-        isOcrRunning,
         lastResult,
-        ocrText,
-        objectCount,
-        loadModels,
-        unloadModels,
+        error,
         analyzeFrame,
-        recognizeText,
-        composeDescription,
         startAnalysisLoop,
         stopAnalysisLoop,
-        hasSceneChanged,
     };
 };

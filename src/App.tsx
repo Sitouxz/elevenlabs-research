@@ -29,14 +29,14 @@ function App() {
     sendContextualUpdate,
   } = useElevenLabs(AGENT_ID);
 
-  // Keep a ref to sendContextualUpdate for the vision loop
+  // Keep a ref to sendContextualUpdate — null it out when disconnected
   useEffect(() => {
-    visionUpdateRef.current = sendContextualUpdate;
-  }, [sendContextualUpdate]);
+    visionUpdateRef.current = isConnected ? sendContextualUpdate : null;
+  }, [sendContextualUpdate, isConnected]);
 
   // Start/stop vision analysis loop when camera and connection are active
   useEffect(() => {
-    if (camera.isCameraOn && vision.isModelReady && isConnected) {
+    if (camera.isCameraOn && vision.isReady && isConnected) {
       vision.startAnalysisLoop(
         () => camera.videoRef.current,
         (description) => {
@@ -44,33 +44,17 @@ function App() {
             visionUpdateRef.current(`[VISION UPDATE] ${description}`);
           }
         },
-        3000
+        10000
       );
     } else {
       vision.stopAnalysisLoop();
     }
     return () => vision.stopAnalysisLoop();
-  }, [camera.isCameraOn, vision.isModelReady, isConnected]);
-
-  // Load/unload models when camera toggles
-  useEffect(() => {
-    if (camera.isCameraOn) {
-      vision.loadModels();
-    }
-  }, [camera.isCameraOn]);
+  }, [camera.isCameraOn, vision.isReady, isConnected]);
 
   const handleToggleCamera = useCallback(async () => {
     await camera.toggleCamera();
   }, [camera]);
-
-  const handleRequestOcr = useCallback(async () => {
-    const canvas = camera.captureFrame();
-    if (!canvas) return;
-    const text = await vision.recognizeText(canvas);
-    if (text && sendContextualUpdate) {
-      sendContextualUpdate(`[OCR RESULT] Detected text in camera view: "${text}"`);
-    }
-  }, [camera, vision, sendContextualUpdate]);
 
   return (
     <div className="bg-midnight font-display text-gray-200 min-h-screen md:h-screen w-full overflow-x-hidden overflow-y-auto md:overflow-hidden relative selection:bg-primary selection:text-black">
@@ -123,10 +107,10 @@ function App() {
                   {camera.isCameraOn ? "ACTIVE" : "OFF"}
                 </span>
               </div>
-              {camera.isCameraOn && (
+              {camera.isCameraOn && vision.isAnalyzing && (
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">OBJECTS</span>
-                  <span className="text-primary">{vision.objectCount} detected</span>
+                  <span className="text-gray-400">VISION</span>
+                  <span className="text-primary">Analyzing...</span>
                 </div>
               )}
             </div>
@@ -162,16 +146,12 @@ function App() {
             <div className="hidden md:block">
               <CameraFeed
                 isCameraOn={camera.isCameraOn}
-                isModelLoading={vision.isModelLoading}
-                isModelReady={vision.isModelReady}
                 isAnalyzing={vision.isAnalyzing}
-                isOcrRunning={vision.isOcrRunning}
+                isReady={vision.isReady}
                 lastResult={vision.lastResult}
-                ocrText={vision.ocrText}
-                objectCount={vision.objectCount}
+                error={vision.error}
                 videoRef={camera.videoRef}
                 onToggleCamera={handleToggleCamera}
-                onRequestOcr={handleRequestOcr}
               />
             </div>
           </div>

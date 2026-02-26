@@ -10,6 +10,8 @@ export const useElevenLabs = (agentId: string) => {
     const [stream, setStream] = useState<MediaStream | null>(null);
 
     const conversationRef = useRef<Conversation | null>(null);
+    const isConnectedRef = useRef(false);
+    const streamRef = useRef<MediaStream | null>(null);
 
     const toggleMute = useCallback(() => {
         if (!stream) return;
@@ -49,17 +51,29 @@ export const useElevenLabs = (agentId: string) => {
                     channelCount: 1,
                 },
             });
+            streamRef.current = micStream;
             setStream(micStream);
             setIsMuted(false);
 
             const sessionOptions: any = {
                 agentId: agentId,
-                // @ts-ignore
-                connectionType: "websocket",
                 onConnect: () => {
+                    isConnectedRef.current = true;
                     setIsConnected(true);
                 },
-                onDisconnect: () => {
+                onDisconnect: (details: any) => {
+                    console.log("ElevenLabs disconnected:", details);
+
+                    // Immediately mark disconnected (sync) to stop all sends
+                    isConnectedRef.current = false;
+                    conversationRef.current = null;
+
+                    // Stop mic tracks to kill the audio worklet
+                    if (streamRef.current) {
+                        streamRef.current.getTracks().forEach((t) => t.stop());
+                        streamRef.current = null;
+                    }
+
                     setIsConnected(false);
                     setIsSpeaking(false);
                     setIsListening(false);
@@ -87,39 +101,56 @@ export const useElevenLabs = (agentId: string) => {
 
             const conversation = await Conversation.startSession(sessionOptions);
             conversationRef.current = conversation;
+            console.log("ElevenLabs session started, id:", conversation.getId());
 
-            // Send vision system prompt as contextual update after connection
-            try {
-                conversation.sendContextualUpdate(
-                    `[SYSTEM] You have real-time camera vision capabilities. ` +
-                    `You will receive contextual updates prefixed with [VISION UPDATE] describing objects and scenes detected in the user's camera. ` +
-                    `You may also receive [OCR RESULT] updates with text detected in the camera view. ` +
-                    `When you receive these updates, naturally incorporate what you see into conversation — describe things conversationally as if you have eyes. ` +
-                    `Do NOT read out raw detection data. Instead say things like "I can see you're holding a..." or "That looks like a...". ` +
-                    `If the user asks what you see, use the most recent vision context. ` +
-                    `Be helpful but not annoying — don't narrate every update. Keep responses concise and natural.`
-                );
-            } catch { /* ignore if not yet ready */ }
+            // Delay the vision system prompt to let the connection stabilize
+            setTimeout(() => {
+                if (!isConnectedRef.current || !conversationRef.current) return;
+                try {
+                    conversationRef.current.sendContextualUpdate(
+                        `[SYSTEM] You have real-time camera vision capabilities. ` +
+                        `You will receive contextual updates prefixed with [VISION UPDATE] describing what the camera sees. ` +
+                        `Naturally incorporate what you see into conversation. ` +
+                        `Say things like "I can see you're holding a..." or "That looks like a...". ` +
+                        `If the user asks what you see, use the most recent vision context.`
+                    );
+                    console.log("Vision system prompt sent.");
+                } catch { /* ignore if disconnected */ }
+            }, 3000);
         } catch (error) {
             console.error("Failed to start conversation:", error);
         }
     }, [agentId]);
 
     const endConversation = useCallback(async () => {
-        if (conversationRef.current) {
-            await conversationRef.current.endSession();
-            conversationRef.current = null;
+        // Mark disconnected first to prevent any further sends
+        isConnectedRef.current = false;
+        const conv = conversationRef.current;
+        conversationRef.current = null;
+
+        // Stop mic tracks before ending session to prevent audio worklet errors
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
+        }
+
+        if (conv) {
+            try {
+                await conv.endSession();
+            } catch {
+                // Ignore errors during cleanup
+            }
         }
         setStream(null);
         setIsMuted(false);
     }, []);
 
     const sendContextualUpdate = useCallback((text: string) => {
-        if (!conversationRef.current) return;
+        // Synchronous ref check — avoids race with React state updates
+        if (!isConnectedRef.current || !conversationRef.current) return;
         try {
-            if (!conversationRef.current.isOpen()) return;
             conversationRef.current.sendContextualUpdate(text);
-        } catch (error) {
+        } catch {
             // Silently ignore if connection is closing/closed
         }
     }, []);
