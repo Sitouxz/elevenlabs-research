@@ -1,12 +1,20 @@
+import { useCallback, useEffect, useRef } from "react";
 import { Visualizer } from "./components/Visualizer";
 import { Controls } from "./components/Controls";
 import { Transcript } from "./components/Transcript";
+import { CameraFeed } from "./components/CameraFeed";
 import { useElevenLabs } from "./hooks/useElevenLabs";
-import { Activity, ShieldCheck } from "lucide-react";
+import { useCamera } from "./hooks/useCamera";
+import { useVision } from "./hooks/useVision";
+import { Activity, ShieldCheck, Eye } from "lucide-react";
 
 const AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "PASTE_YOUR_AGENT_ID_HERE";
 
 function App() {
+  const camera = useCamera();
+  const vision = useVision();
+  const visionUpdateRef = useRef<((text: string) => void) | null>(null);
+
   const {
     isConnected,
     isSpeaking,
@@ -17,8 +25,52 @@ function App() {
     startConversation,
     endConversation,
     toggleMute,
-    interrupt
+    interrupt,
+    sendContextualUpdate,
   } = useElevenLabs(AGENT_ID);
+
+  // Keep a ref to sendContextualUpdate for the vision loop
+  useEffect(() => {
+    visionUpdateRef.current = sendContextualUpdate;
+  }, [sendContextualUpdate]);
+
+  // Start/stop vision analysis loop when camera and connection are active
+  useEffect(() => {
+    if (camera.isCameraOn && vision.isModelReady && isConnected) {
+      vision.startAnalysisLoop(
+        () => camera.videoRef.current,
+        (description) => {
+          if (visionUpdateRef.current) {
+            visionUpdateRef.current(`[VISION UPDATE] ${description}`);
+          }
+        },
+        3000
+      );
+    } else {
+      vision.stopAnalysisLoop();
+    }
+    return () => vision.stopAnalysisLoop();
+  }, [camera.isCameraOn, vision.isModelReady, isConnected]);
+
+  // Load/unload models when camera toggles
+  useEffect(() => {
+    if (camera.isCameraOn) {
+      vision.loadModels();
+    }
+  }, [camera.isCameraOn]);
+
+  const handleToggleCamera = useCallback(async () => {
+    await camera.toggleCamera();
+  }, [camera]);
+
+  const handleRequestOcr = useCallback(async () => {
+    const canvas = camera.captureFrame();
+    if (!canvas) return;
+    const text = await vision.recognizeText(canvas);
+    if (text && sendContextualUpdate) {
+      sendContextualUpdate(`[OCR RESULT] Detected text in camera view: "${text}"`);
+    }
+  }, [camera, vision, sendContextualUpdate]);
 
   return (
     <div className="bg-midnight font-display text-gray-200 min-h-screen md:h-screen w-full overflow-x-hidden overflow-y-auto md:overflow-hidden relative selection:bg-primary selection:text-black">
@@ -64,6 +116,19 @@ function App() {
                   />
                 </div>
               </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 flex items-center gap-1"><Eye size={10} />CAMERA</span>
+                <span className={`font-bold flex items-center gap-1 ${camera.isCameraOn ? "text-green-400" : "text-gray-500"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${camera.isCameraOn ? "bg-green-400 animate-pulse" : "bg-gray-500"}`}></span>
+                  {camera.isCameraOn ? "ACTIVE" : "OFF"}
+                </span>
+              </div>
+              {camera.isCameraOn && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">OBJECTS</span>
+                  <span className="text-primary">{vision.objectCount} detected</span>
+                </div>
+              )}
             </div>
             {/* Decorative corners */}
             <div className="absolute -top-1 -left-1 w-3 h-3 border-t border-l border-primary opacity-50 group-hover:opacity-100 transition-opacity" />
@@ -86,11 +151,30 @@ function App() {
 
         {/* Center Stage: The AI Visualizer */}
         <main className="flex-grow flex flex-col items-center justify-center relative">
-          <Visualizer
-            isSpeaking={isSpeaking}
-            isListening={isListening}
-            audioStream={stream}
-          />
+          <div className="flex items-center gap-6">
+            <Visualizer
+              isSpeaking={isSpeaking}
+              isListening={isListening}
+              audioStream={stream}
+            />
+
+            {/* Camera Feed Panel */}
+            <div className="hidden md:block">
+              <CameraFeed
+                isCameraOn={camera.isCameraOn}
+                isModelLoading={vision.isModelLoading}
+                isModelReady={vision.isModelReady}
+                isAnalyzing={vision.isAnalyzing}
+                isOcrRunning={vision.isOcrRunning}
+                lastResult={vision.lastResult}
+                ocrText={vision.ocrText}
+                objectCount={vision.objectCount}
+                videoRef={camera.videoRef}
+                onToggleCamera={handleToggleCamera}
+                onRequestOcr={handleRequestOcr}
+              />
+            </div>
+          </div>
 
           {/* AI Status Text */}
           <div className="mt-8 text-center">
@@ -108,10 +192,12 @@ function App() {
             <Controls
               isConnected={isConnected}
               isMuted={isMuted}
+              isCameraOn={camera.isCameraOn}
               onStart={startConversation}
               onEnd={endConversation}
               onToggleMute={toggleMute}
               onInterrupt={interrupt}
+              onToggleCamera={handleToggleCamera}
             />
           </div>
           <div className="w-full md:w-[30%] lg:w-1/4 flex justify-end pointer-events-auto">

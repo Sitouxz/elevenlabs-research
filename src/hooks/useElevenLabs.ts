@@ -52,13 +52,10 @@ export const useElevenLabs = (agentId: string) => {
             setStream(micStream);
             setIsMuted(false);
 
-            const conversation = await Conversation.startSession({
+            const sessionOptions: any = {
                 agentId: agentId,
                 // @ts-ignore
                 connectionType: "websocket",
-                // Optimize session for latency
-                // Note: Actual threshold and latency levels are best set in the ElevenLabs Agent Dashboard
-                // but we can pass initial configurations here if the SDK version supports it.
                 onConnect: () => {
                     setIsConnected(true);
                 },
@@ -86,9 +83,23 @@ export const useElevenLabs = (agentId: string) => {
                     setIsSpeaking(mode.mode === "speaking");
                     setIsListening(mode.mode === "listening");
                 },
-            });
+            };
 
+            const conversation = await Conversation.startSession(sessionOptions);
             conversationRef.current = conversation;
+
+            // Send vision system prompt as contextual update after connection
+            try {
+                conversation.sendContextualUpdate(
+                    `[SYSTEM] You have real-time camera vision capabilities. ` +
+                    `You will receive contextual updates prefixed with [VISION UPDATE] describing objects and scenes detected in the user's camera. ` +
+                    `You may also receive [OCR RESULT] updates with text detected in the camera view. ` +
+                    `When you receive these updates, naturally incorporate what you see into conversation — describe things conversationally as if you have eyes. ` +
+                    `Do NOT read out raw detection data. Instead say things like "I can see you're holding a..." or "That looks like a...". ` +
+                    `If the user asks what you see, use the most recent vision context. ` +
+                    `Be helpful but not annoying — don't narrate every update. Keep responses concise and natural.`
+                );
+            } catch { /* ignore if not yet ready */ }
         } catch (error) {
             console.error("Failed to start conversation:", error);
         }
@@ -103,6 +114,16 @@ export const useElevenLabs = (agentId: string) => {
         setIsMuted(false);
     }, []);
 
+    const sendContextualUpdate = useCallback((text: string) => {
+        if (!conversationRef.current) return;
+        try {
+            if (!conversationRef.current.isOpen()) return;
+            conversationRef.current.sendContextualUpdate(text);
+        } catch (error) {
+            // Silently ignore if connection is closing/closed
+        }
+    }, []);
+
     return {
         isConnected,
         isSpeaking,
@@ -114,5 +135,6 @@ export const useElevenLabs = (agentId: string) => {
         endConversation,
         toggleMute,
         interrupt,
+        sendContextualUpdate,
     };
 };
