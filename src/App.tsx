@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Visualizer } from "./components/Visualizer";
 import { Controls } from "./components/Controls";
 import { Transcript } from "./components/Transcript";
@@ -14,6 +14,7 @@ function App() {
   const camera = useCamera();
   const vision = useVision();
   const visionUpdateRef = useRef<((text: string) => void) | null>(null);
+  const [hasSentFirstScan, setHasSentFirstScan] = useState(false);
 
   const {
     isConnected,
@@ -29,14 +30,20 @@ function App() {
     sendContextualUpdate,
   } = useElevenLabs(AGENT_ID);
 
-  // Keep a ref to sendContextualUpdate — null it out when disconnected
+  // Only enable sending to ElevenLabs after the first scan has been delivered
   useEffect(() => {
-    visionUpdateRef.current = isConnected ? sendContextualUpdate : null;
-  }, [sendContextualUpdate, isConnected]);
+    visionUpdateRef.current =
+      isConnected && hasSentFirstScan ? sendContextualUpdate : null;
+  }, [sendContextualUpdate, isConnected, hasSentFirstScan]);
 
-  // Start/stop vision analysis loop when camera and connection are active
+  // Reset first-scan flag when disconnected
   useEffect(() => {
-    if (camera.isCameraOn && vision.isReady && isConnected) {
+    if (!isConnected) setHasSentFirstScan(false);
+  }, [isConnected]);
+
+  // Start vision analysis as soon as camera is on — independent of ElevenLabs
+  useEffect(() => {
+    if (camera.isCameraOn && vision.isReady) {
       vision.startAnalysisLoop(
         () => camera.videoRef.current,
         (description) => {
@@ -50,7 +57,21 @@ function App() {
       vision.stopAnalysisLoop();
     }
     return () => vision.stopAnalysisLoop();
-  }, [camera.isCameraOn, vision.isReady, isConnected]);
+  }, [camera.isCameraOn, vision.isReady]);
+
+  // Once connected AND first scan result is ready, send system prompt + scan together
+  useEffect(() => {
+    if (isConnected && vision.lastResult && !hasSentFirstScan) {
+      sendContextualUpdate(
+        `[SYSTEM] You have real-time camera vision. ` +
+        `You will receive [VISION UPDATE] messages describing what the camera sees. ` +
+        `Naturally talk about what you see. Do NOT narrate every update.\n\n` +
+        `[VISION UPDATE] ${vision.lastResult.description}`
+      );
+      setHasSentFirstScan(true);
+      console.log("First vision scan sent to JARVIS.");
+    }
+  }, [isConnected, vision.lastResult, hasSentFirstScan, sendContextualUpdate]);
 
   const handleToggleCamera = useCallback(async () => {
     await camera.toggleCamera();

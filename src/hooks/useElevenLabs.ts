@@ -102,21 +102,6 @@ export const useElevenLabs = (agentId: string) => {
             const conversation = await Conversation.startSession(sessionOptions);
             conversationRef.current = conversation;
             console.log("ElevenLabs session started, id:", conversation.getId());
-
-            // Delay the vision system prompt to let the connection stabilize
-            setTimeout(() => {
-                if (!isConnectedRef.current || !conversationRef.current) return;
-                try {
-                    conversationRef.current.sendContextualUpdate(
-                        `[SYSTEM] You have real-time camera vision capabilities. ` +
-                        `You will receive contextual updates prefixed with [VISION UPDATE] describing what the camera sees. ` +
-                        `Naturally incorporate what you see into conversation. ` +
-                        `Say things like "I can see you're holding a..." or "That looks like a...". ` +
-                        `If the user asks what you see, use the most recent vision context.`
-                    );
-                    console.log("Vision system prompt sent.");
-                } catch { /* ignore if disconnected */ }
-            }, 3000);
         } catch (error) {
             console.error("Failed to start conversation:", error);
         }
