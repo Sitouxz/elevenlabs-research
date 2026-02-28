@@ -14,6 +14,7 @@ function App() {
   const camera = useCamera();
   const vision = useVision();
   const visionUpdateRef = useRef<((text: string) => void) | null>(null);
+  const isSpeakingRef = useRef(false);
   const [hasSentFirstScan, setHasSentFirstScan] = useState(false);
 
   const {
@@ -29,6 +30,11 @@ function App() {
     interrupt,
     sendContextualUpdate,
   } = useElevenLabs(AGENT_ID);
+
+  // Keep isSpeakingRef in sync for use inside callbacks
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
 
   // Only enable sending to ElevenLabs after the first scan has been delivered
   useEffect(() => {
@@ -47,6 +53,8 @@ function App() {
       vision.startAnalysisLoop(
         () => camera.videoRef.current,
         (description) => {
+          // Don't send while JARVIS is speaking — avoid interrupting mid-sentence
+          if (isSpeakingRef.current) return;
           if (visionUpdateRef.current) {
             visionUpdateRef.current(`[VISION UPDATE] ${description}`);
           }
