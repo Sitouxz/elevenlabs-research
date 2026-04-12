@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="solarsky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a7090"/>
+      <stop offset="50%" style="stop-color:#90b060"/>
+      <stop offset="100%" style="stop-color:#608050"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#solarsky)"/>
+  <!-- Solar panel field -->
+  <rect x="50" y="600" width="900" height="300" fill="rgba(30,50,80,0.8)" rx="4"/>
+  <!-- Panel grid -->
+  <line x1="50" y1="650" x2="950" y2="650" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="50" y1="700" x2="950" y2="700" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="50" y1="750" x2="950" y2="750" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="50" y1="800" x2="950" y2="800" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="50" y1="850" x2="950" y2="850" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="200" y1="600" x2="200" y2="900" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="350" y1="600" x2="350" y2="900" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="500" y1="600" x2="500" y2="900" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="650" y1="600" x2="650" y2="900" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <line x1="800" y1="600" x2="800" y2="900" stroke="#7FE040" stroke-width="1" opacity="0.5"/>
+  <!-- Wind turbines right side -->
+  <line x1="1200" y1="680" x2="1200" y2="200" stroke="#d0dce8" stroke-width="8"/>
+  <line x1="1200" y1="200" x2="1230" y2="350" stroke="#d0dce8" stroke-width="5"/>
+  <line x1="1200" y1="200" x2="1160" y2="340" stroke="#d0dce8" stroke-width="5"/>
+  <line x1="1200" y1="200" x2="1200" y2="80" stroke="#d0dce8" stroke-width="5"/>
+  <line x1="1450" y1="700" x2="1450" y2="280" stroke="#d0dce8" stroke-width="7"/>
+  <line x1="1450" y1="280" x2="1478" y2="410" stroke="#d0dce8" stroke-width="4"/>
+  <line x1="1450" y1="280" x2="1416" y2="400" stroke="#d0dce8" stroke-width="4"/>
+  <!-- Singapore right skyline -->
+  <rect x="1600" y="300" width="180" height="380" rx="10" fill="#c0d4e0" opacity="0.5"/>
+  <rect x="1700" y="200" width="120" height="480" rx="10" fill="#b8ccd8" opacity="0.45"/>
+  <!-- Sun -->
+  <circle cx="960" cy="180" r="80" fill="#D4E800" opacity="0.7"/>
+  <!-- Glow -->
+  <circle cx="960" cy="180" r="120" fill="#D4E800" opacity="0.2"/>
+  <!-- Bottom dark -->
+  <rect y="850" width="1920" height="230" fill="rgba(10,14,26,0.65)"/>
+</svg>

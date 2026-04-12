@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="evsky" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2a3a"/>
+      <stop offset="60%" style="stop-color:#2a4030"/>
+      <stop offset="100%" style="stop-color:#3a5020"/>
+    </linearGradient>
+    <linearGradient id="road-ev" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#304030"/>
+      <stop offset="100%" style="stop-color:#1a2820"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#evsky)"/>
+  <rect y="640" width="1920" height="440" fill="url(#road-ev)"/>
+  <!-- Road lane markings -->
+  <rect x="400" y="660" width="200" height="8" fill="#D4E800" opacity="0.7" rx="4"/>
+  <rect x="700" y="660" width="200" height="8" fill="#D4E800" opacity="0.7" rx="4"/>
+  <rect x="1000" y="660" width="200" height="8" fill="#D4E800" opacity="0.7" rx="4"/>
+  <rect x="1300" y="660" width="200" height="8" fill="#D4E800" opacity="0.7" rx="4"/>
+  <!-- EV Charging stations -->
+  <rect x="200" y="500" width="30" height="140" rx="5" fill="#c0d8e8"/>
+  <rect x="185" y="490" width="60" height="25" rx="5" fill="#7FE040"/>
+  <rect x="500" y="520" width="30" height="120" rx="5" fill="#c0d8e8"/>
+  <rect x="485" y="510" width="60" height="25" rx="5" fill="#D4E800"/>
+  <!-- Smart city buildings -->
+  <rect x="900" y="200" width="200" height="440" rx="15" fill="#304858" opacity="0.8"/>
+  <rect x="1100" y="280" width="150" height="360" rx="12" fill="#283c50" opacity="0.75"/>
+  <rect x="1300" y="320" width="120" height="320" rx="10" fill="#304858" opacity="0.7"/>
+  <!-- Building windows glow -->
+  <rect x="920" y="220" width="30" height="20" rx="3" fill="#7FE040" opacity="0.6"/>
+  <rect x="960" y="220" width="30" height="20" rx="3" fill="#7FE040" opacity="0.4"/>
+  <rect x="1000" y="220" width="30" height="20" rx="3" fill="#D4E800" opacity="0.5"/>
+  <rect x="1040" y="220" width="30" height="20" rx="3" fill="#7FE040" opacity="0.6"/>
+  <!-- Glow on ground -->
+  <ellipse cx="960" cy="650" rx="600" ry="60" fill="#7FE040" opacity="0.08"/>
+  <!-- Bottom dark -->
+  <rect y="850" width="1920" height="230" fill="rgba(10,14,26,0.7)"/>
+</svg>

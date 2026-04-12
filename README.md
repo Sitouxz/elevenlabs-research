@@ -1,73 +1,54 @@
-# React + TypeScript + Vite
+# ITE Smart Gallery Avatar
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An AI-powered interactive kiosk experience featuring **Lumi**, a smart energy guide avatar for the ITE Smart Gallery.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19 + TypeScript + Vite
+- TailwindCSS v4 + Framer Motion
+- ElevenLabs Conversational AI (dual agents)
+- Akool Real-Time Streaming Avatar (with static fallback)
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Copy `.env.example` to `.env` and fill in your credentials:
 
-## Expanding the ESLint configuration
+```env
+# ElevenLabs — create two agents at https://elevenlabs.io/conversational-ai
+VITE_ELEVENLABS_NAV_AGENT_ID=your_nav_agent_id
+VITE_ELEVENLABS_QNA_AGENT_ID=your_qna_agent_id
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Akool — get credentials at https://akool.com/dashboard
+VITE_AKOOL_CLIENT_ID=your_client_id
+VITE_AKOOL_CLIENT_SECRET=your_client_secret
+VITE_AKOOL_AVATAR_ID=your_avatar_id
+VITE_AKOOL_VOICE_ID=your_voice_id
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Install and run:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
+
+## Screens
+
+| Screen | Trigger |
+|--------|---------|
+| Splash | App start — speak or tap to continue |
+| Main Menu | After splash — shows START DISCOVERY + ASK QUESTIONS |
+| Topic Select | Voice: "start discovery" or button click |
+| Topic Detail | Voice: topic name or orb click |
+| Ask Questions | Voice: "ask questions" or button click — QnA agent activates here only |
+
+## Avatar
+
+- **Primary**: Akool real-time streaming (WebRTC) — requires `VITE_AKOOL_*` env vars
+- **Fallback**: Static SVG (`/public/lumi-static.svg`) + ElevenLabs voice if Akool unavailable
+
+## Replacing Assets
+
+- Drop your Lumi avatar PNG at `public/lumi-static.png` (or update path in `LumiAvatar.tsx`)
+- Replace background SVGs in `public/backgrounds/` with actual photos/renders
+- Replace icon SVGs in `public/icons/` with final artwork

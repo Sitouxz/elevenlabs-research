@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 700" fill="none">
+  <defs>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c8d0d8"/>
+      <stop offset="100%" style="stop-color:#a0a8b0"/>
+    </linearGradient>
+    <linearGradient id="jacketGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d8e0e8"/>
+      <stop offset="100%" style="stop-color:#b0bcc8"/>
+    </linearGradient>
+    <linearGradient id="hairGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2a2820"/>
+      <stop offset="100%" style="stop-color:#1a1810"/>
+    </linearGradient>
+    <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0c8a0"/>
+      <stop offset="100%" style="stop-color:#d8a878"/>
+    </linearGradient>
+    <radialGradient id="glowHalo" cx="50%" cy="70%" r="50%">
+      <stop offset="0%" style="stop-color:#7FE040;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#7FE040;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Ambient glow behind avatar -->
+  <ellipse cx="200" cy="500" rx="200" ry="250" fill="url(#glowHalo)"/>
+
+  <!-- Body / torso -->
+  <ellipse cx="200" cy="560" rx="95" ry="120" fill="url(#bodyGrad)"/>
+
+  <!-- Jacket -->
+  <path d="M110 480 Q120 440 160 430 Q180 425 200 428 Q220 425 240 430 Q280 440 290 480 L310 620 Q260 650 200 655 Q140 650 90 620 Z" fill="url(#jacketGrad)"/>
+  <!-- Jacket accent lines (teal trim) -->
+  <path d="M190 430 L185 500 L182 580" stroke="#b0c8d8" stroke-width="3" fill="none" opacity="0.8"/>
+  <path d="M210 430 L215 500 L218 580" stroke="#b0c8d8" stroke-width="3" fill="none" opacity="0.8"/>
+  <!-- Jacket collar -->
+  <path d="M170 430 Q200 445 230 430 L225 460 Q200 472 175 460 Z" fill="#c8d4dc"/>
+
+  <!-- Inner shirt -->
+  <ellipse cx="200" cy="470" rx="30" ry="35" fill="#6a7888"/>
+
+  <!-- Neck -->
+  <rect x="183" y="390" width="34" height="50" rx="17" fill="url(#skinGrad)"/>
+
+  <!-- Head -->
+  <ellipse cx="200" cy="340" rx="80" ry="88" fill="url(#skinGrad)"/>
+
+  <!-- Hair - back/sides -->
+  <path d="M130 300 Q120 260 140 230 Q160 200 200 195 Q240 200 260 230 Q280 260 270 300 Q250 270 200 268 Q150 270 130 300Z" fill="url(#hairGrad)"/>
+  <!-- Hair bob cut -->
+  <path d="M126 310 Q120 370 140 400 Q155 415 165 418 Q145 395 142 360 Q135 330 130 300Z" fill="url(#hairGrad)"/>
+  <path d="M274 310 Q280 370 260 400 Q245 415 235 418 Q255 395 258 360 Q265 330 270 300Z" fill="url(#hairGrad)"/>
+  <path d="M140 230 Q160 200 200 194 Q240 200 260 230 Q240 215 200 213 Q160 215 140 230Z" fill="url(#hairGrad)"/>
+  <!-- Hair top -->
+  <ellipse cx="200" cy="228" rx="68" ry="38" fill="url(#hairGrad)"/>
+
+  <!-- Face features -->
+  <!-- Eyes -->
+  <ellipse cx="174" cy="338" rx="11" ry="8" fill="#2a2828"/>
+  <ellipse cx="226" cy="338" rx="11" ry="8" fill="#2a2828"/>
+  <!-- Eye shine -->
+  <circle cx="177" cy="335" r="3" fill="white" opacity="0.8"/>
+  <circle cx="229" cy="335" r="3" fill="white" opacity="0.8"/>
+  <!-- Eyebrows -->
+  <path d="M162 326 Q174 320 186 324" stroke="#2a2828" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M214 324 Q226 320 238 326" stroke="#2a2828" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Nose -->
+  <path d="M197 350 Q195 362 200 366 Q205 362 203 350" stroke="#c09070" stroke-width="1.5" fill="none"/>
+  <!-- Mouth - slight smile -->
+  <path d="M185 378 Q200 388 215 378" stroke="#b07858" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M188 378 Q200 384 212 378" fill="#c08870" opacity="0.4"/>
+
+  <!-- Arms -->
+  <!-- Left arm (raised/waving) -->
+  <path d="M108 470 Q70 440 55 400 Q48 375 60 360 Q72 345 85 358 Q95 370 100 395 Q110 430 118 460Z" fill="url(#jacketGrad)"/>
+  <!-- Left hand -->
+  <ellipse cx="62" cy="355" rx="20" ry="22" fill="url(#skinGrad)"/>
+  <path d="M52 345 Q45 330 48 320" stroke="url(#skinGrad)" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <path d="M60 342 Q56 326 60 316" stroke="url(#skinGrad)" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <path d="M70 343 Q68 327 73 317" stroke="url(#skinGrad)" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <path d="M78 348 Q79 332 84 325" stroke="url(#skinGrad)" stroke-width="10" stroke-linecap="round" fill="none"/>
+
+  <!-- Right arm (pointing/natural) -->
+  <path d="M292 470 Q330 450 345 490 Q355 520 340 540 Q330 555 318 545 Q305 530 298 500Z" fill="url(#jacketGrad)"/>
+  <!-- Right hand -->
+  <ellipse cx="343" cy="545" rx="18" ry="20" fill="url(#skinGrad)"/>
+
+  <!-- Smart wristband glow -->
+  <rect x="88" y="438" width="22" height="12" rx="4" fill="#7FE040" opacity="0.7"/>
+  <rect x="89" y="439" width="20" height="10" rx="3" fill="#D4E800" opacity="0.5"/>
+
+  <!-- Bottom fade -->
+  <rect x="0" y="600" width="400" height="100" fill="url(#glowHalo)" opacity="0.3"/>
+</svg>
