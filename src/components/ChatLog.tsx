@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { AgentMessage } from "../hooks/useElevenLabsAgent";
+import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 
 interface ChatLogProps {
   messages: AgentMessage[];
@@ -16,10 +16,10 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
     }
   }, [messages]);
 
-  const recent = messages.slice(-6);
+  const recent = messages.slice(-3);
 
   return (
-    <div className={`relative w-full ${className}`} style={{ height: "clamp(80px, 12vh, 140px)" }}>
+    <div className={`relative w-full ${className}`} style={{ height: "clamp(120px, 18vh, 220px)" }}>
 
       {/* Dark glass background */}
       <div
@@ -48,9 +48,9 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
           <div
             className="flex items-center gap-2 px-4 h-full"
             style={{
+              minWidth: "fit-content",
               background: "linear-gradient(90deg, #7FE040, #D4E800)",
               clipPath: "polygon(0 0, 100% 0, 92% 100%, 0 100%)",
-              minWidth: "clamp(100px, 12vw, 200px)",
             }}
           >
             {/* Triangle arrow */}
@@ -66,7 +66,7 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
             <span
               className="font-heading font-extrabold"
               style={{
-                fontSize: "clamp(0.45rem, 0.8vw, 0.7rem)",
+                fontSize: "clamp(0.6rem, 0.85vw, 0.75rem)",
                 letterSpacing: "0.15em",
                 color: "#1a1e2e",
               }}
@@ -78,10 +78,10 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
 
         {/* Message area */}
         <div
-          className="flex-1 overflow-hidden px-[clamp(10px,2vw,48px)] pb-[clamp(2px,0.5vh,8px)]"
+          className="flex-1 overflow-hidden px-[clamp(12px,2.5vw,48px)] pb-[clamp(4px,0.8vh,12px)] pt-[clamp(2px,0.4vh,6px)]"
           ref={scrollRef}
         >
-          <div className="overflow-y-auto h-full space-y-[2px] scrollbar-hide">
+          <div className="overflow-y-auto h-full space-y-[clamp(4px,0.6vh,8px)] scrollbar-hide">
             <AnimatePresence initial={false}>
               {recent.map((msg, i) => (
                 <motion.div
@@ -92,11 +92,12 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
                   transition={{ duration: 0.25 }}
                 >
                   <p
-                    className="leading-snug"
+                    className="leading-relaxed"
                     style={{
                       fontFamily: "'Open Sans', sans-serif",
-                      fontSize: "clamp(0.55rem, 0.9vw, 0.85rem)",
-                      color: msg.role === "ai" ? "rgba(255,255,255,0.7)" : "#00D4B8",
+                      fontSize: "clamp(0.72rem, 1.05vw, 1rem)",
+                      color: msg.role === "ai" ? "rgba(255,255,255,0.82)" : "#00D4B8",
+                      wordBreak: "break-word",
                     }}
                   >
                     {msg.role === "user" && <span style={{ color: "#7FE040", marginRight: 6 }}>●</span>}
@@ -110,7 +111,7 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
               <p
                 style={{
                   fontFamily: "'Open Sans', sans-serif",
-                  fontSize: "clamp(0.55rem, 0.9vw, 0.85rem)",
+                  fontSize: "clamp(0.72rem, 1.05vw, 1rem)",
                   color: "rgba(255,255,255,0.3)",
                 }}
               >
@@ -124,3 +125,4 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
     </div>
   );
 }
+

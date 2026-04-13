@@ -4,7 +4,7 @@ import { ChatLog } from "../components/ChatLog";
 import { MicIndicator } from "../components/MicIndicator";
 import { TOPICS } from "../types";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
-import type { AgentMessage } from "../hooks/useElevenLabsAgent";
+import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 import type { TopicId } from "../types";
 
 interface TopicDetailScreenProps {
@@ -130,6 +130,9 @@ export function TopicDetailScreen({
             isReady={avatar.isReady}
             isSpeaking={avatar.isSpeaking}
             videoRef={avatar.videoRef}
+            videoContainer={avatar.videoContainer}
+            videoTrackReady={avatar.videoTrackReady}
+            retryPlay={avatar.retryPlay}
             className="h-[85vh] max-h-[820px]"
           />
         </motion.div>
@@ -170,3 +173,6 @@ export function TopicDetailScreen({
     </div>
   );
 }
+
+
+

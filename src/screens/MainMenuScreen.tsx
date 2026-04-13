@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { LumiAvatar } from "../components/LumiAvatar";
 import { ChatLog } from "../components/ChatLog";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
-import type { AgentMessage } from "../hooks/useElevenLabsAgent";
+import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 import type { AppScreen } from "../types";
 
 const FIGMA_CITY_BG      = "https://www.figma.com/api/mcp/asset/aa7a1e83-0252-4918-87a3-1e58fdcba520";
@@ -59,6 +59,9 @@ export function MainMenuScreen({ avatar, messages, onNavigate }: MainMenuScreenP
             isReady={avatar.isReady}
             isSpeaking={avatar.isSpeaking}
             videoRef={avatar.videoRef}
+            videoContainer={avatar.videoContainer}
+            videoTrackReady={avatar.videoTrackReady}
+            retryPlay={avatar.retryPlay}
             staticSrc={FIGMA_LUMI}
             className="h-[78vh] max-h-[820px] object-contain"
           />
@@ -160,3 +163,6 @@ export function MainMenuScreen({ avatar, messages, onNavigate }: MainMenuScreenP
     </div>
   );
 }
+
+
+

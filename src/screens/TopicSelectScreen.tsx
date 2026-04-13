@@ -5,7 +5,7 @@ import { TopicOrb } from "../components/TopicOrb";
 import { MicIndicator } from "../components/MicIndicator";
 import { TOPICS } from "../types";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
-import type { AgentMessage } from "../hooks/useElevenLabsAgent";
+import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 import type { TopicId } from "../types";
 
 interface TopicSelectScreenProps {
@@ -52,6 +52,9 @@ export function TopicSelectScreen({ avatar, messages, isListening, onSelectTopic
             isReady={avatar.isReady}
             isSpeaking={avatar.isSpeaking}
             videoRef={avatar.videoRef}
+            videoContainer={avatar.videoContainer}
+            videoTrackReady={avatar.videoTrackReady}
+            retryPlay={avatar.retryPlay}
             className="h-[85vh] max-h-[820px]"
           />
         </motion.div>
@@ -142,3 +145,6 @@ export function TopicSelectScreen({ avatar, messages, isListening, onSelectTopic
     </div>
   );
 }
+
+
+

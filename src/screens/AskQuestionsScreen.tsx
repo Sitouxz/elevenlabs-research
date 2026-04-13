@@ -3,7 +3,7 @@ import { LumiAvatar } from "../components/LumiAvatar";
 import { ChatLog } from "../components/ChatLog";
 import { MicIndicator } from "../components/MicIndicator";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
-import type { AgentMessage } from "../hooks/useElevenLabsAgent";
+import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 
 interface AskQuestionsScreenProps {
   avatar: UseAkoolAvatarReturn;
@@ -62,6 +62,9 @@ export function AskQuestionsScreen({ avatar, messages, isListening, isSpeaking, 
             isReady={avatar.isReady}
             isSpeaking={isSpeaking}
             videoRef={avatar.videoRef}
+            videoContainer={avatar.videoContainer}
+            videoTrackReady={avatar.videoTrackReady}
+            retryPlay={avatar.retryPlay}
             className="h-[85vh] max-h-[820px]"
           />
 
@@ -115,3 +118,6 @@ export function AskQuestionsScreen({ avatar, messages, isListening, isSpeaking, 
     </div>
   );
 }
+
+
+

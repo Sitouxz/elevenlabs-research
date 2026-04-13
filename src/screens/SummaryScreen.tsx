@@ -60,6 +60,9 @@ export function SummaryScreen({
             isReady={avatar.isReady}
             isSpeaking={avatar.isSpeaking}
             videoRef={avatar.videoRef}
+            videoContainer={avatar.videoContainer}
+            videoTrackReady={avatar.videoTrackReady}
+            retryPlay={avatar.retryPlay}
             className="h-[85vh] max-h-[820px]"
           />
         </motion.div>
@@ -144,3 +147,6 @@ export function SummaryScreen({
     </div>
   );
 }
+
+
+

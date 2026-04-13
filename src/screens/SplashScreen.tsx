@@ -127,6 +127,9 @@ export function SplashScreen({ avatar, isListening, onTap }: SplashScreenProps) 
             isReady={avatar.isReady}
             isSpeaking={avatar.isSpeaking}
             videoRef={avatar.videoRef}
+            videoContainer={avatar.videoContainer}
+            videoTrackReady={avatar.videoTrackReady}
+            retryPlay={avatar.retryPlay}
             staticSrc={FIGMA_LUMI_IMAGE}
             className="h-[73vh] max-h-[820px] object-contain"
           />
@@ -163,3 +166,6 @@ export function SplashScreen({ avatar, isListening, onTap }: SplashScreenProps) 
     </div>
   );
 }
+
+
+

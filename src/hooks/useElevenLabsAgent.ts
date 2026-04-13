@@ -17,7 +17,12 @@ export interface UseElevenLabsAgentReturn {
   sendContextualUpdate: (text: string) => void;
 }
 
-export function useElevenLabsAgent(agentId: string): UseElevenLabsAgentReturn {
+export interface ElevenLabsAgentOptions {
+  muteOutput?: boolean;
+  onAiSpeak?: (text: string) => void;
+}
+
+export function useElevenLabsAgent(agentId: string, opts: ElevenLabsAgentOptions = {}): UseElevenLabsAgentReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -26,6 +31,8 @@ export function useElevenLabsAgent(agentId: string): UseElevenLabsAgentReturn {
   const conversationRef = useRef<Conversation | null>(null);
   const isConnectedRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
 
   const startSession = useCallback(async () => {
     if (isConnectedRef.current) return;
@@ -51,6 +58,9 @@ export function useElevenLabsAgent(agentId: string): UseElevenLabsAgentReturn {
         onConnect: () => {
           isConnectedRef.current = true;
           setIsConnected(true);
+          if (optsRef.current.muteOutput && conversationRef.current) {
+            conversationRef.current.setVolume({ volume: 0 });
+          }
         },
         onDisconnect: () => {
           isConnectedRef.current = false;
@@ -65,14 +75,14 @@ export function useElevenLabsAgent(agentId: string): UseElevenLabsAgentReturn {
         },
         onMessage: (message: any) => {
           if (message.message) {
+            const role = message.source === "ai" ? "ai" : "user";
             setMessages((prev) => [
               ...prev,
-              {
-                role: message.source === "ai" ? "ai" : "user",
-                text: message.message,
-                timestamp: Date.now(),
-              },
+              { role, text: message.message, timestamp: Date.now() },
             ]);
+            if (role === "ai" && optsRef.current.onAiSpeak) {
+              optsRef.current.onAiSpeak(message.message);
+            }
           }
         },
         onError: (error: any) => {

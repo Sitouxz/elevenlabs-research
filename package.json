@@ -13,6 +13,7 @@
     "@11labs/client": "^0.2.0",
     "@elevenlabs/client": "^0.14.0",
     "@tailwindcss/vite": "^4.1.18",
+    "agora-rtc-sdk-ng": "^4.24.3",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.563.0",

@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { LumiAvatar } from "../components/LumiAvatar";
 import { ChatLog } from "../components/ChatLog";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
-import type { AgentMessage } from "../hooks/useElevenLabsAgent";
+import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 
 const FIGMA_CITY_BG   = "https://www.figma.com/api/mcp/asset/7a68b531-6ff0-470c-8e18-13165d0da2e9";
 const FIGMA_LUMI      = "https://www.figma.com/api/mcp/asset/b511859d-f8ad-4860-8663-33fbbfab42fa";
@@ -72,6 +72,9 @@ export function EndScenarioScreen({
           isReady={avatar.isReady}
           isSpeaking={avatar.isSpeaking}
           videoRef={avatar.videoRef}
+          videoContainer={avatar.videoContainer}
+          videoTrackReady={avatar.videoTrackReady}
+          retryPlay={avatar.retryPlay}
           staticSrc={FIGMA_LUMI}
           className="object-contain h-[72vh] max-h-[820px]"
         />
@@ -129,3 +132,6 @@ export function EndScenarioScreen({
     </div>
   );
 }
+
+
+
