@@ -123,6 +123,8 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const micTrackRef = useRef<ILocalAudioTrack | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const isSpeakingRef = useRef(false);
+  const speakingMuteRef = useRef(false);
+  const unmutePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const partialBotRef = useRef<string>("");
   const speechRecRef = useRef<any>(null);
 
@@ -208,9 +210,9 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               stt_type: "openai_realtime",
               turn_detection: {
                 type: "server_vad",
-                threshold: 0.5,
+                threshold: 0.75,
                 prefix_padding_ms: 300,
-                silence_duration_ms: 500,
+                silence_duration_ms: 800,
               },
               ...(ELEVENLABS_API_KEY ? {
                 elevenlabs_settings: {
@@ -318,15 +320,39 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             console.log("[Akool stream-message]", JSON.stringify(msg).slice(0, 200));
           }
 
-          // TTS status events — track speaking state
+          // TTS status events — track speaking state + mute mic while avatar speaks
           if (msg?.type === "tts") {
             const status = msg?.pld?.status ?? msg?.status;
             if (status === "start" || status === "speaking") {
               isSpeakingRef.current = true;
               setIsSpeaking(true);
+              // Mute mic + browser STT so speaker audio doesn't feed back into STT
+              if (!speakingMuteRef.current) {
+                speakingMuteRef.current = true;
+                micTrackRef.current?.setMuted(true).catch(() => {});
+                if (speechRecRef.current) {
+                  speechRecRef.current.onend = null;
+                  try { speechRecRef.current.stop(); } catch { /* already stopped */ }
+                }
+                setIsListening(false);
+              }
             } else if (status === "end" || status === "done") {
               isSpeakingRef.current = false;
               setIsSpeaking(false);
+              // Unmute mic 400ms after TTS ends to let speaker audio decay
+              if (speakingMuteRef.current) {
+                speakingMuteRef.current = false;
+                if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+                unmutePendingRef.current = setTimeout(() => {
+                  unmutePendingRef.current = null;
+                  micTrackRef.current?.setMuted(false).catch(() => {});
+                  if (speechRecRef.current) {
+                    speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+                    try { speechRecRef.current.start(); } catch { /* already running */ }
+                  }
+                  setIsListening(true);
+                }, 400);
+              }
             }
           }
 
@@ -482,19 +508,49 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     if (mode !== "streaming" || !client) return;
     isSpeakingRef.current = true;
     setIsSpeaking(true);
+    // Mute mic immediately — unmute happens when TTS end event arrives
+    if (!speakingMuteRef.current) {
+      speakingMuteRef.current = true;
+      micTrackRef.current?.setMuted(true).catch(() => {});
+      if (speechRecRef.current) {
+        speechRecRef.current.onend = null;
+        try { speechRecRef.current.stop(); } catch { /* already stopped */ }
+      }
+      setIsListening(false);
+    }
     try {
       await sendChunked(client, text, "tts");
-      // Safety reset if server never sends a done event
+      // Safety reset if server never sends a done event within 30s
       setTimeout(() => {
         if (isSpeakingRef.current) {
           isSpeakingRef.current = false;
           setIsSpeaking(false);
+        }
+        if (speakingMuteRef.current) {
+          speakingMuteRef.current = false;
+          if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+          unmutePendingRef.current = setTimeout(() => {
+            unmutePendingRef.current = null;
+            micTrackRef.current?.setMuted(false).catch(() => {});
+            if (speechRecRef.current) {
+              speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+              try { speechRecRef.current.start(); } catch { /* already running */ }
+            }
+            setIsListening(true);
+          }, 400);
         }
       }, 30000);
     } catch (e) {
       console.error("[Akool] Speak failed:", e);
       isSpeakingRef.current = false;
       setIsSpeaking(false);
+      speakingMuteRef.current = false;
+      micTrackRef.current?.setMuted(false).catch(() => {});
+      if (speechRecRef.current) {
+        speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+        try { speechRecRef.current.start(); } catch { /* already running */ }
+      }
+      setIsListening(true);
     }
   }, [mode]);
 
