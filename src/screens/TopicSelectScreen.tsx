@@ -13,9 +13,10 @@ interface TopicSelectScreenProps {
   messages: AgentMessage[];
   isListening: boolean;
   onSelectTopic: (id: TopicId) => void;
+  onBack?: () => void;
 }
 
-export function TopicSelectScreen({ avatar, messages, isListening, onSelectTopic }: TopicSelectScreenProps) {
+export function TopicSelectScreen({ avatar, messages, isListening, onSelectTopic, onBack }: TopicSelectScreenProps) {
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
@@ -142,6 +143,19 @@ export function TopicSelectScreen({ avatar, messages, isListening, onSelectTopic
       >
         <ChatLog messages={messages} />
       </motion.div>
+
+      {/* Back button */}
+      {onBack && (
+        <motion.button
+          onClick={onBack}
+          className="absolute top-8 left-8 z-30 glass-panel px-4 py-2 rounded-lg text-white/80 hover:text-white transition-colors"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+        >
+          ← Back
+        </motion.button>
+      )}
     </div>
   );
 }

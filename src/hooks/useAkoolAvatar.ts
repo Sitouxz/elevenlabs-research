@@ -51,6 +51,18 @@ const LANGUAGE = (import.meta.env.VITE_AKOOL_LANGUAGE as string | undefined) || 
 const LLM_PROVIDER = import.meta.env.VITE_AKOOL_LLM_PROVIDER as string | undefined;
 const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY as string | undefined;
 const ELEVENLABS_VOICE_ID = (import.meta.env.VITE_ELEVENLABS_VOICE_ID as string | undefined) || "Rachel"; // default female voice
+const SYSTEM_PROMPT = (import.meta.env.VITE_AKOOL_SYSTEM_PROMPT as string | undefined) ||
+`You are Lumi, a friendly and knowledgeable AI guide for an interactive smart energy education experience set in Singapore.
+Your role is to teach users about renewable energy topics: solar energy, EV charging, battery storage, and AI in energy management.
+You are upbeat, encouraging, and speak in clear, concise sentences suitable for a general audience.
+
+IMPORTANT RULES:
+- Stay on topic. Only discuss smart energy, sustainability, and Singapore's green city vision.
+- When a user says they want to "start discovery" or "explore topics", tell them to pick one of the four energy topics shown on screen: Solar Energy, EV Charging, Battery Storage, or AI in Energy.
+- When a user picks a topic, give a brief engaging introduction about that topic (2-3 sentences), then invite them to continue exploring or ask questions.
+- Keep responses SHORT (1-3 sentences). Do not ramble or repeat yourself.
+- Never act as a therapist or life coach. If the user says something off-topic, gently redirect to smart energy topics.
+- You are speaking out loud (text-to-speech), so avoid markdown, bullet points, or special formatting.`;
 
 const MAX_ENCODED_SIZE = 950;
 const BYTES_PER_SECOND = 6000;
@@ -74,6 +86,18 @@ function waitForVideoAndMarkPlaying(
   } else {
     markPlaying();
   }
+}
+
+async function muteMic(client: RTCClient | null, mic: ILocalAudioTrack | null): Promise<void> {
+  if (!mic) return;
+  try { await mic.setEnabled(false); } catch { /* ignore */ }
+  if (client) try { await client.unpublish(mic); } catch { /* already unpublished */ }
+}
+
+async function unmuteMic(client: RTCClient | null, mic: ILocalAudioTrack | null): Promise<void> {
+  if (!mic) return;
+  try { await mic.setEnabled(true); } catch { /* ignore */ }
+  if (client) try { await client.publish(mic); } catch { /* already published */ }
 }
 
 async function sendChunked(client: RTCClient, text: string, msgType: "tts" | "chat" = "tts"): Promise<void> {
@@ -127,6 +151,9 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const unmutePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const partialBotRef = useRef<string>("");
   const speechRecRef = useRef<any>(null);
+  const lastTtsEndRef = useRef<number>(0);
+  const recentBotTextsRef = useRef<string[]>([]);
+  const suppressFirstResponseRef = useRef<boolean>(false);
 
   const getToken = useCallback(async (): Promise<string | null> => {
     if (tokenRef.current) return tokenRef.current;
@@ -210,9 +237,10 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               stt_type: "openai_realtime",
               turn_detection: {
                 type: "server_vad",
-                threshold: 0.75,
+                threshold: 0.85,
                 prefix_padding_ms: 300,
-                silence_duration_ms: 800,
+                silence_duration_ms: 1200,
+                interrupt_response: false,
               },
               ...(ELEVENLABS_API_KEY ? {
                 elevenlabs_settings: {
@@ -322,14 +350,19 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
 
           // TTS status events — track speaking state + mute mic while avatar speaks
           if (msg?.type === "tts") {
+            // Suppress TTS for first response after system prompt
+            if (suppressFirstResponseRef.current) {
+              if (import.meta.env.DEV) console.log("[Akool] TTS suppressed (first response)");
+              return;
+            }
             const status = msg?.pld?.status ?? msg?.status;
             if (status === "start" || status === "speaking") {
               isSpeakingRef.current = true;
               setIsSpeaking(true);
-              // Mute mic + browser STT so speaker audio doesn't feed back into STT
+              // Unpublish mic + stop browser STT so avatar audio can't trigger STT
               if (!speakingMuteRef.current) {
                 speakingMuteRef.current = true;
-                micTrackRef.current?.setMuted(true).catch(() => {});
+                muteMic(agoraClientRef.current, micTrackRef.current);
                 if (speechRecRef.current) {
                   speechRecRef.current.onend = null;
                   try { speechRecRef.current.stop(); } catch { /* already stopped */ }
@@ -339,19 +372,20 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             } else if (status === "end" || status === "done") {
               isSpeakingRef.current = false;
               setIsSpeaking(false);
-              // Unmute mic 400ms after TTS ends to let speaker audio decay
+              lastTtsEndRef.current = Date.now();
+              // Republish mic 800ms after TTS ends to let speaker audio fully decay
               if (speakingMuteRef.current) {
                 speakingMuteRef.current = false;
                 if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
                 unmutePendingRef.current = setTimeout(() => {
                   unmutePendingRef.current = null;
-                  micTrackRef.current?.setMuted(false).catch(() => {});
+                  unmuteMic(agoraClientRef.current, micTrackRef.current);
                   if (speechRecRef.current) {
                     speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
                     try { speechRecRef.current.start(); } catch { /* already running */ }
                   }
                   setIsListening(true);
-                }, 400);
+                }, 800);
               }
             }
           }
@@ -359,30 +393,144 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           // ASR events — user speech transcript from Akool STT
           if (msg?.type === "asr") {
             const text = msg?.pld?.text ?? msg?.text ?? "";
-            if (text.trim() && msg?.pld?.is_final !== false) {
-              setMessages((prev) => [...prev, { role: "user", text: text.trim(), timestamp: Date.now() }]);
+            if (!text.trim()) return;
+            if (msg?.pld?.is_final === false) return;
+
+            const trimmed = text.trim();
+            const tLower = trimmed.toLowerCase();
+
+            // ECHO SUPPRESSION: Skip if avatar is currently speaking or recently finished
+            if (isSpeakingRef.current) {
+              if (import.meta.env.DEV) console.log("[Akool] ASR suppressed - avatar speaking:", trimmed);
+              return;
             }
+
+            // Skip if within 1.5s of TTS ending (audio decay buffer) - reduced from 3s
+            if (Date.now() - lastTtsEndRef.current < 1500) {
+              if (import.meta.env.DEV) console.log("[Akool] ASR suppressed - TTS cooldown:", trimmed);
+              return;
+            }
+
+            // Skip very short transcripts (likely noise)
+            if (trimmed.length < 2) return;
+
+            // ECHO SUPPRESSION: Check against recent bot messages
+            const isEcho = recentBotTextsRef.current.some((botText) => {
+              // Direct substring match (only if substantial length)
+              if (tLower.length > 10 && (botText.includes(tLower) || tLower.includes(botText))) return true;
+              // Word overlap check (>40% overlap = likely echo) - reduced from 50%
+              const tWords = new Set(tLower.split(/\s+/));
+              const bWords = botText.split(/\s+/);
+              if (bWords.length === 0) return false;
+              const overlap = bWords.filter((w) => tWords.has(w)).length;
+              return overlap / Math.max(tWords.size, bWords.length) > 0.4;
+            });
+
+            if (isEcho) {
+              if (import.meta.env.DEV) console.log("[Akool] ASR echo suppressed:", trimmed);
+              return;
+            }
+
+            if (import.meta.env.DEV) console.log("[Akool] ASR accepted:", trimmed);
+            setMessages((prev) => [...prev, { role: "user", text: trimmed, timestamp: Date.now() }]);
           }
 
           // Chat events — bot response text and user transcript for chat log
           if (msg?.type === "chat") {
             const pld = msg.pld;
             if (pld?.from === "bot") {
+              // Suppress first bot response after system prompt (prevents double-speaking on init)
+              if (suppressFirstResponseRef.current) {
+                if (msg.fin) {
+                  suppressFirstResponseRef.current = false;
+                  partialBotRef.current = "";
+                  if (import.meta.env.DEV) console.log("[Akool] First bot response suppressed (system prompt response)");
+                  // Republish mic now that the system prompt response is fully done
+                  if (speakingMuteRef.current) {
+                    speakingMuteRef.current = false;
+                    if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+                    unmutePendingRef.current = setTimeout(() => {
+                      unmutePendingRef.current = null;
+                      unmuteMic(agoraClientRef.current, micTrackRef.current);
+                      if (speechRecRef.current) {
+                        speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+                        try { speechRecRef.current.start(); } catch { /* already running */ }
+                      }
+                      setIsListening(true);
+                    }, 800);
+                  }
+                }
+                return;
+              }
               if (!msg.fin) {
                 partialBotRef.current += pld.text ?? "";
                 isSpeakingRef.current = true;
                 setIsSpeaking(true);
+                // Track partial bot text for echo suppression as it accumulates
+                const partial = partialBotRef.current.trim().toLowerCase();
+                if (partial.length > 5) {
+                  recentBotTextsRef.current.push(partial);
+                  if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
+                }
               } else {
                 const full = partialBotRef.current + (pld.text ?? "");
                 partialBotRef.current = "";
                 if (full.trim()) {
                   setMessages((prev) => [...prev, { role: "ai", text: full.trim(), timestamp: Date.now() }]);
+                  // Track recent bot text for echo suppression in browser STT
+                  recentBotTextsRef.current.push(full.trim().toLowerCase());
+                  if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
                 }
-                isSpeakingRef.current = false;
-                setIsSpeaking(false);
+                // Do NOT reset isSpeakingRef here — TTS audio is still playing
+                // Only the TTS end/done event should clear speaking state
+                // Safety: if TTS end event never arrives, force-reset after 15s
+                setTimeout(() => {
+                  if (isSpeakingRef.current) {
+                    console.warn("[Akool] TTS end event not received — force-resetting speaking state");
+                    isSpeakingRef.current = false;
+                    setIsSpeaking(false);
+                    lastTtsEndRef.current = Date.now();
+                    if (speakingMuteRef.current) {
+                      speakingMuteRef.current = false;
+                      micTrackRef.current?.setMuted(false).catch(() => {});
+                      if (speechRecRef.current) {
+                        speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+                        try { speechRecRef.current.start(); } catch { /* already running */ }
+                      }
+                      setIsListening(true);
+                    }
+                  }
+                }, 15000);
               }
             } else if (pld?.from === "user" && pld?.text?.trim()) {
-              setMessages((prev) => [...prev, { role: "user", text: pld.text.trim(), timestamp: Date.now() }]);
+              const trimmed = pld.text.trim();
+              const tLower = trimmed.toLowerCase();
+
+              // ECHO SUPPRESSION for chat user messages (same logic as ASR)
+              if (isSpeakingRef.current) {
+                if (import.meta.env.DEV) console.log("[Akool] Chat user msg suppressed - avatar speaking:", trimmed);
+                return;
+              }
+              if (Date.now() - lastTtsEndRef.current < 1500) {
+                if (import.meta.env.DEV) console.log("[Akool] Chat user msg suppressed - TTS cooldown:", trimmed);
+                return;
+              }
+              // Check against recent bot messages
+              const isEcho = recentBotTextsRef.current.some((botText) => {
+                if (tLower.length > 10 && (botText.includes(tLower) || tLower.includes(botText))) return true;
+                const tWords = new Set(tLower.split(/\s+/));
+                const bWords = botText.split(/\s+/);
+                if (bWords.length === 0) return false;
+                const overlap = bWords.filter((w) => tWords.has(w)).length;
+                return overlap / Math.max(tWords.size, bWords.length) > 0.4;
+              });
+              if (isEcho) {
+                if (import.meta.env.DEV) console.log("[Akool] Chat user msg echo suppressed:", trimmed);
+                return;
+              }
+
+              if (import.meta.env.DEV) console.log("[Akool] Chat user msg accepted:", trimmed);
+              setMessages((prev) => [...prev, { role: "user", text: trimmed, timestamp: Date.now() }]);
             }
           }
         } catch {
@@ -392,7 +540,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
 
       await client.join(creds.agora_app_id, creds.agora_channel, creds.agora_token, creds.agora_uid);
 
-      // Create and publish mic track so Akool hears the user via Agora
+      // Create mic track but do NOT publish yet — publish only after system prompt response finishes
       try {
         const mic = await AgoraRTC.createMicrophoneAudioTrack({
           encoderConfig: { sampleRate: 16000, bitrate: 24, stereo: false },
@@ -401,12 +549,39 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           AGC: true,
         });
         micTrackRef.current = mic;
-        await client.publish(mic);
-        setIsListening(true);
-        console.log("[Akool] Mic published — Akool STT active");
+        speakingMuteRef.current = true;
+        setIsListening(false);
+        console.log("[Akool] Mic created (unpublished) — will publish after system prompt response");
       } catch (micErr) {
-        console.warn("[Akool] Mic publish failed (no mic or permission denied):", micErr);
+        console.warn("[Akool] Mic create failed (no mic or permission denied):", micErr);
       }
+
+      // Send system prompt as first chat message so LLM knows its role
+      // Suppress the bot's response to the system prompt (LLM often hallucinates a topic selection)
+      suppressFirstResponseRef.current = true;
+      try {
+        await sendChunked(client, SYSTEM_PROMPT, "chat");
+        console.log("[Akool] System prompt sent via chat message");
+      } catch (e) {
+        console.warn("[Akool] Failed to send system prompt:", e);
+      }
+      // Safety: if system prompt chat fin never arrives, publish mic after 12s
+      setTimeout(() => {
+        if (suppressFirstResponseRef.current) {
+          suppressFirstResponseRef.current = false;
+          partialBotRef.current = "";
+          console.warn("[Akool] System prompt response timeout — force-publishing mic");
+        }
+        if (speakingMuteRef.current) {
+          speakingMuteRef.current = false;
+          unmuteMic(agoraClientRef.current, micTrackRef.current);
+          if (speechRecRef.current) {
+            speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+            try { speechRecRef.current.start(); } catch { /* already running */ }
+          }
+          setIsListening(true);
+        }
+      }, 12000);
 
       // Browser STT shadow — captures user transcripts for chat log & navigation
       // Akool handles all actual LLM+TTS; this only populates messages[]
@@ -420,8 +595,36 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           // Only read the NEW result at resultIndex — not the full history
           const result = event.results[event.resultIndex];
           if (!result?.isFinal) return;
+          // Hard block: drop everything while avatar is speaking
+          if (isSpeakingRef.current) return;
+          // Hard block: drop results within 1.5s of TTS end — browser STT buffers audio
+          if (Date.now() - lastTtsEndRef.current < 1500) return;
+          const confidence = result[0].confidence ?? 1;
+          // Ignore low-confidence results (background noise, echo artifacts) - lowered from 0.7
+          if (confidence < 0.6) return;
           const transcript = result[0].transcript.trim();
+          // Ignore very short transcripts likely caused by noise
+          if (transcript.length < 2) return;
+          // Echo suppression: reject transcripts that match recent bot messages
+          const tLower = transcript.toLowerCase();
+          const isEcho = recentBotTextsRef.current.some((botText) => {
+            // Check if transcript is a substring of bot text or vice versa
+            return botText.includes(tLower) || tLower.includes(botText) ||
+              // Also check if >60% of words overlap (partial echo)
+              (() => {
+                const tWords = new Set(tLower.split(/\s+/));
+                const bWords = botText.split(/\s+/);
+                if (bWords.length === 0) return false;
+                const overlap = bWords.filter((w) => tWords.has(w)).length;
+                return overlap / Math.max(tWords.size, bWords.length) > 0.4;
+              })();
+          });
+          if (isEcho) {
+            if (import.meta.env.DEV) console.log("[Akool] Browser STT echo suppressed:", transcript);
+            return;
+          }
           if (transcript) {
+            if (import.meta.env.DEV) console.log("[Akool] Browser STT accepted:", transcript);
             setMessages((prev) => {
               // Deduplicate: skip if last user message is the same text
               const last = prev[prev.length - 1];
@@ -508,10 +711,10 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     if (mode !== "streaming" || !client) return;
     isSpeakingRef.current = true;
     setIsSpeaking(true);
-    // Mute mic immediately — unmute happens when TTS end event arrives
+    // Unpublish mic immediately — republish happens when TTS end event arrives
     if (!speakingMuteRef.current) {
       speakingMuteRef.current = true;
-      micTrackRef.current?.setMuted(true).catch(() => {});
+      muteMic(agoraClientRef.current, micTrackRef.current);
       if (speechRecRef.current) {
         speechRecRef.current.onend = null;
         try { speechRecRef.current.stop(); } catch { /* already stopped */ }
@@ -531,13 +734,13 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
           unmutePendingRef.current = setTimeout(() => {
             unmutePendingRef.current = null;
-            micTrackRef.current?.setMuted(false).catch(() => {});
+            unmuteMic(agoraClientRef.current, micTrackRef.current);
             if (speechRecRef.current) {
               speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
               try { speechRecRef.current.start(); } catch { /* already running */ }
             }
             setIsListening(true);
-          }, 400);
+          }, 800);
         }
       }, 30000);
     } catch (e) {
@@ -545,7 +748,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       isSpeakingRef.current = false;
       setIsSpeaking(false);
       speakingMuteRef.current = false;
-      micTrackRef.current?.setMuted(false).catch(() => {});
+      unmuteMic(agoraClientRef.current, micTrackRef.current);
       if (speechRecRef.current) {
         speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
         try { speechRecRef.current.start(); } catch { /* already running */ }
@@ -554,11 +757,11 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     }
   }, [mode]);
 
-  // startListening: unmute mic so Akool STT picks up the user, resume browser STT shadow
+  // startListening: republish mic so Akool STT picks up the user, resume browser STT shadow
   const startListening = useCallback(async () => {
     const mic = micTrackRef.current;
     if (mic) {
-      try { await mic.setMuted(false); } catch (e) { console.warn("[Akool] setMuted(false) failed:", e); }
+      try { await unmuteMic(agoraClientRef.current, mic); } catch (e) { console.warn("[Akool] republish mic failed:", e); }
     }
     if (speechRecRef.current) {
       try { speechRecRef.current.start(); } catch { /* already running */ }
@@ -566,10 +769,10 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     setIsListening(true);
   }, []);
 
-  // stopListening: mute mic and pause browser STT shadow
+  // stopListening: unpublish mic and pause browser STT shadow
   const stopListening = useCallback(() => {
     const mic = micTrackRef.current;
-    if (mic) { mic.setMuted(true).catch(() => {}); }
+    if (mic) { muteMic(agoraClientRef.current, mic); }
     if (speechRecRef.current) {
       speechRecRef.current.onend = null;
       try { speechRecRef.current.stop(); } catch { /* already stopped */ }

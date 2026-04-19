@@ -25,9 +25,9 @@ const PRELOAD_IMAGES = [
 
 
 const SCREEN_TRANSITIONS = {
-  initial: { opacity: 0, scale: 1.02 },
-  animate: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 0.98 },
+  initial: { opacity: 0, scale: 1.02, pointerEvents: "none" as const },
+  animate: { opacity: 1, scale: 1, pointerEvents: "auto" as const },
+  exit: { opacity: 0, scale: 0.98, pointerEvents: "none" as const },
 };
 
 function App() {
@@ -68,6 +68,11 @@ function App() {
     if (avatar.messages.length === 0) return;
     const last = avatar.messages[avatar.messages.length - 1];
     if (last.role !== "user") return;
+    // Skip stale messages (>5s old) or overly long text (likely bot echo)
+    if (Date.now() - (last.timestamp ?? 0) > 5000) return;
+    if (last.text.length > 100) return;
+    // CRITICAL: Don't process navigation if avatar is speaking (prevents self-triggering)
+    if (avatar.isSpeaking) return;
 
     const action = parseIntent(last.text);
 
@@ -84,18 +89,22 @@ function App() {
       return;
     }
 
-    // topic-select / topic-detail: only navigate when on menu/select screens, not mid-conversation
-    const canNavigateToContent = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail";
-    if (!canNavigateToContent) return;
-
-    if (action.screen === "topic-select") {
+    // topic-select: works from most screens
+    if (action.screen === "topic-select" && screen !== "topic-select") {
       setActiveMenuBtn("topic-select");
       setTimeout(() => { setScreen("topic-select"); setActiveMenuBtn(null); }, 600);
-    } else if (action.screen === "topic-detail" && action.topic) {
-      setActiveTopic(action.topic);
-      setScreen("topic-detail");
+      return;
     }
-  }, [avatar.messages, parseIntent, screen]);
+
+    // topic-detail: navigate when on menu/select screens
+    if (action.screen === "topic-detail" && action.topic) {
+      const canNavigateToTopic = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail" || screen === "splash";
+      if (canNavigateToTopic) {
+        setActiveTopic(action.topic);
+        setScreen("topic-detail");
+      }
+    }
+  }, [avatar.messages, avatar.isSpeaking, parseIntent, screen]);
 
   // No auto-transition - user must click on splash screen to proceed
 
@@ -124,6 +133,14 @@ function App() {
 
   const handleBack = () => {
     if (screen === "topic-detail") setScreen("topic-select");
+    else if (screen === "topic-select") setScreen("main-menu");
+    else if (screen === "ask-questions") setScreen("main-menu");
+    else if (screen === "naration") setScreen("topic-detail");
+    else if (screen === "scenario-title") setScreen("naration");
+    else if (screen === "decision") setScreen("scenario-title");
+    else if (screen === "score") setScreen("decision");
+    else if (screen === "summary") setScreen("score");
+    else if (screen === "end-scenario") setScreen("summary");
     else setScreen("main-menu");
   };
 
@@ -206,6 +223,7 @@ function App() {
               messages={currentMessages}
               isListening={isListening}
               onSelectTopic={handleSelectTopic}
+              onBack={handleBack}
             />
           </motion.div>
         )}
