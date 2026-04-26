@@ -4,10 +4,10 @@ import { ChatLog } from "../components/ChatLog";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 
-const FIGMA_CITY_BG   = "https://www.figma.com/api/mcp/asset/7a68b531-6ff0-470c-8e18-13165d0da2e9";
-const FIGMA_LUMI      = "https://www.figma.com/api/mcp/asset/b511859d-f8ad-4860-8663-33fbbfab42fa";
+const FIGMA_CITY_BG   = "/assets/end-city-bg.png";
+const FIGMA_LUMI      = "/assets/end-lumi.png";
 
-const FIGMA_VECTOR4   = "https://www.figma.com/api/mcp/asset/cccdb064-c502-46f2-b9dd-4c13699f4996";
+const FIGMA_VECTOR4   = "/assets/end-vector4.png";
 
 interface EndScenarioScreenProps {
   avatar: UseAkoolAvatarReturn;

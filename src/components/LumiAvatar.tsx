@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import type { AvatarMode } from "../hooks/useAkoolAvatar";
 
-const DEFAULT_LUMI_STATIC = "https://www.figma.com/api/mcp/asset/6f7c3d2d-42d2-43b8-ac9a-66aeb2ce7ad4";
+const DEFAULT_LUMI_STATIC = "/assets/menu-lumi.png";
 
 // Pixels where R,G,B all above this AND saturation is low are keyed out
 const WHITE_THRESHOLD = 225;

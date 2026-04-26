@@ -29,7 +29,7 @@ export function TopicDetailScreen({
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
-      <img src="https://www.figma.com/api/mcp/asset/b262c770-e3cb-42c9-b10c-801c65ce4173" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
+      <img src="/assets/topic-detail-city-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
       {/* Glow ellipse behind Lumi (RIGHT) — Figma Ellipse 1: x=2600(67.7%), y=595(27.5%), w=872(22.7%), h=1466(67.9%) */}

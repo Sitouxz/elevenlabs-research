@@ -21,7 +21,7 @@ export function NarationScreen({
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
-      <img src="https://www.figma.com/api/mcp/asset/aa7a1e83-0252-4918-87a3-1e58fdcba520" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
+      <img src="/assets/menu-city-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
       {/* Glow ellipse behind Lumi — Figma Ellipse 1: x=370(9.6%), y=639(29.6%), w=872(22.7%), h=1466(67.9%) */}

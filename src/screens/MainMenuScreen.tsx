@@ -5,8 +5,8 @@ import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 import type { AppScreen } from "../types";
 
-const FIGMA_CITY_BG      = "https://www.figma.com/api/mcp/asset/aa7a1e83-0252-4918-87a3-1e58fdcba520";
-const FIGMA_LUMI         = "https://www.figma.com/api/mcp/asset/6f7c3d2d-42d2-43b8-ac9a-66aeb2ce7ad4";
+const FIGMA_CITY_BG      = "/assets/menu-city-bg.png";
+const FIGMA_LUMI         = "/assets/menu-lumi.png";
 
 interface MainMenuScreenProps {
   avatar: UseAkoolAvatarReturn;

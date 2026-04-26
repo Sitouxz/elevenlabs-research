@@ -16,11 +16,11 @@ import { SummaryScreen } from "./screens/SummaryScreen";
 import type { AppScreen, TopicId } from "./types";
 
 const PRELOAD_IMAGES = [
-  "https://www.figma.com/api/mcp/asset/9a630a07-f746-4336-b0e0-f602fd417f12", // Splash city bg
-  "https://www.figma.com/api/mcp/asset/9580eb4b-f9a9-405a-83a8-83370a432bc5", // Splash Lumi
-  "https://www.figma.com/api/mcp/asset/aa7a1e83-0252-4918-87a3-1e58fdcba520", // Menu city bg
-  "https://www.figma.com/api/mcp/asset/6f7c3d2d-42d2-43b8-ac9a-66aeb2ce7ad4", // Menu Lumi
-  "https://www.figma.com/api/mcp/asset/97f59666-1c43-4cbf-ae58-cc9798e5287a", // Leaf
+  "/assets/splash-city-bg.png", // Splash city bg
+  "/assets/splash-lumi.png",    // Splash Lumi
+  "/assets/menu-city-bg.png",   // Menu city bg
+  "/assets/menu-lumi.png",      // Menu Lumi
+  "/assets/splash-leaf-tl.png", // Leaf
 ];
 
 
@@ -61,7 +61,15 @@ function App() {
   }, [preloadImages]);
 
   const avatar = useAkoolAvatar();
-  const { parseIntent } = useVoiceNav();
+  const { parseIntent, updateContextFromAvatar } = useVoiceNav();
+
+  // Track avatar messages to set navigation context for guided responses
+  useEffect(() => {
+    if (avatar.messages.length === 0) return;
+    const last = avatar.messages[avatar.messages.length - 1];
+    if (last.role !== "ai") return;
+    updateContextFromAvatar(last.text);
+  }, [avatar.messages, updateContextFromAvatar]);
 
   // Parse user messages for voice-driven screen transitions
   useEffect(() => {
@@ -72,7 +80,10 @@ function App() {
     if (Date.now() - (last.timestamp ?? 0) > 5000) return;
     if (last.text.length > 100) return;
     // CRITICAL: Don't process navigation if avatar is speaking (prevents self-triggering)
-    if (avatar.isSpeaking) return;
+    if (avatar.isSpeaking) {
+      console.log("[App] Navigation blocked - avatar is speaking");
+      return;
+    }
 
     const action = parseIntent(last.text);
 

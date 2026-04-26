@@ -1,9 +1,17 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import type { AppScreen, TopicId } from "../types";
 
 export interface VoiceNavAction {
   screen?: AppScreen;
   topic?: TopicId;
+}
+
+// Conversation context for guided navigation
+interface ConversationContext {
+  suggestedScreen?: AppScreen;
+  suggestedTopic?: TopicId;
+  timestamp: number;
+  expiresAt: number;
 }
 
 // Topic selection requires explicit phrasing — avoids false positives from casual mentions
@@ -72,40 +80,135 @@ function hasExplicitPhrase(text: string, phrases: string[]): boolean {
   return false;
 }
 
+// Avatar speech patterns that suggest navigation
+const NAVIGATION_SUGGESTIONS = [
+  { pattern: /explore (\w+(?:\s+\w+)?)/i, screen: "topic-detail", extractTopic: true },
+  { pattern: /learn about (\w+(?:\s+\w+)?)/i, screen: "topic-detail", extractTopic: true },
+  { pattern: /ask (?:me |you )?(?:a )?question/i, screen: "ask-questions" },
+  { pattern: /go (?:back|home|to menu|to main)/i, screen: "main-menu" },
+  { pattern: /check out (?:the )?topics/i, screen: "topic-select" },
+  { pattern: /show (?:me )?(?:the )?topics/i, screen: "topic-select" },
+  { pattern: /start (?:the )?(?:discovery|exploring)/i, screen: "topic-select" },
+  { pattern: /try (?:the )?(\w+(?:\s+\w+)?) (?:challenge|module|topic)/i, screen: "topic-detail", extractTopic: true },
+  { pattern: /begin (?:the )?(\w+(?:\s+\w+)?)/i, screen: "topic-detail", extractTopic: true },
+  { pattern: /shall we (?:start|begin|go|explore)/i, screen: "topic-select" },
+  { pattern: /want to (?:ask|learn|explore)/i, screen: "ask-questions" },
+];
+
+// Affirmative responses that accept a navigation suggestion
+const AFFIRMATIVE_RESPONSES = [
+  "yes", "yeah", "sure", "okay", "ok", "let's go", "lets go",
+  "go ahead", "do it", "why not", "absolutely", "of course",
+  "sounds good", "that sounds good", "i'd like that", "id like that",
+  "please", "yes please", "yeah sure", "okay sure", "all right", "alright"
+];
+
+// Topic name mapping for extraction
+const TOPIC_MAP: Record<string, TopicId> = {
+  'solar': 'solar',
+  'solar energy': 'solar',
+  'ev': 'ev',
+  'ev charging': 'ev',
+  'electric vehicle': 'ev',
+  'electric vehicles': 'ev',
+  'battery': 'battery',
+  'battery storage': 'battery',
+  'storage': 'battery',
+  'energy storage': 'battery',
+  'ai': 'ai',
+  'artificial intelligence': 'ai',
+  'ai in energy': 'ai'
+};
+
 export function useVoiceNav() {
+  const contextRef = useRef<ConversationContext | null>(null);
+
+  // Update context when avatar suggests navigation
+  const updateContextFromAvatar = useCallback((avatarText: string) => {
+    const lower = avatarText.toLowerCase();
+
+    for (const suggestion of NAVIGATION_SUGGESTIONS) {
+      const match = lower.match(suggestion.pattern);
+      if (match) {
+        let topic: TopicId | undefined;
+
+        if (suggestion.extractTopic && match[1]) {
+          const topicKey = match[1].toLowerCase().trim();
+          topic = TOPIC_MAP[topicKey];
+        }
+
+        // Store context for 10 seconds
+        contextRef.current = {
+          suggestedScreen: suggestion.screen as AppScreen,
+          suggestedTopic: topic,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + 10000
+        };
+
+        if (import.meta.env.DEV) {
+          console.log('[VoiceNav] Context set:', contextRef.current);
+        }
+        return;
+      }
+    }
+  }, []);
+
   const parseIntent = useCallback((text: string): VoiceNavAction => {
     const lower = text.toLowerCase().trim();
 
     // Ignore very short queries (likely noise or fragments)
+    if (lower.length < 2) return {};
+
+    const now = Date.now();
+    const context = contextRef.current;
+
+    // 1. Check for affirmative response to recent navigation suggestion
+    if (context && now < context.expiresAt) {
+      const isAffirmative = AFFIRMATIVE_RESPONSES.some(
+        response => lower === response || lower.startsWith(response + ' ') || lower.startsWith(response + '!') || lower.startsWith(response + '.')
+      );
+
+      if (isAffirmative) {
+        if (import.meta.env.DEV) {
+          console.log('[VoiceNav] Affirmative response detected:', text, '->', context.suggestedScreen);
+        }
+
+        const action: VoiceNavAction = {
+          screen: context.suggestedScreen,
+          topic: context.suggestedTopic
+        };
+        contextRef.current = null;
+        return action;
+      }
+    }
+
+    // 2. Context expired, clear it
+    if (context && now >= context.expiresAt) {
+      contextRef.current = null;
+    }
+
+    // 3. Original logic: Ignore very short queries for keyword matching
     if (lower.length < 4) return {};
 
-    // 1. ACTION INTENTS checked FIRST with EXPLICIT matching
-    // Must be at start or clearly intentional, not mid-sentence mentions
-
-    // Ask questions - requires explicit intent phrasing
+    // 4. ACTION INTENTS checked with EXPLICIT matching
     if (hasExplicitPhrase(lower, EXPLICIT_ACTION_PHRASES.askQuestion)) {
       return { screen: "ask-questions" };
     }
 
-    // Go back / main menu
     if (hasExplicitPhrase(lower, EXPLICIT_ACTION_PHRASES.goBack)) {
       return { screen: "main-menu" };
     }
 
-    // Start discovery / explore topics
     if (hasExplicitPhrase(lower, EXPLICIT_ACTION_PHRASES.startDiscovery)) {
       return { screen: "topic-select" };
     }
 
-    // 2. TOPIC SELECTION — only match explicit topic phrases at start or clear boundaries
+    // 5. TOPIC SELECTION
     for (const { topic, phrases } of TOPIC_EXPLICIT_PHRASES) {
       for (const phrase of phrases) {
-        // Topic selection must be at the start of the utterance (high confidence)
-        // This prevents "Do you have questions about solar energy?" from matching
         if (lower.startsWith(phrase)) {
           return { screen: "topic-detail", topic };
         }
-        // Or after clear intent markers like "tell me about", "explain", "what is"
         const intentPrefixes = [
           "tell me about ",
           "explain ",
@@ -125,5 +228,5 @@ export function useVoiceNav() {
     return {};
   }, []);
 
-  return { parseIntent };
+  return { parseIntent, updateContextFromAvatar };
 }

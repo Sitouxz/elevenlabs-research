@@ -3,9 +3,9 @@ import { LumiAvatar } from "../components/LumiAvatar";
 import { MicIndicator } from "../components/MicIndicator";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 
-const FIGMA_CITY_BG = "https://www.figma.com/api/mcp/asset/9a630a07-f746-4336-b0e0-f602fd417f12";
-const FIGMA_LUMI_IMAGE = "https://www.figma.com/api/mcp/asset/9580eb4b-f9a9-405a-83a8-83370a432bc5";
-const FIGMA_LEAF_TL = "https://www.figma.com/api/mcp/asset/97f59666-1c43-4cbf-ae58-cc9798e5287a";
+const FIGMA_CITY_BG = "/assets/splash-city-bg.png";
+const FIGMA_LUMI_IMAGE = "/assets/splash-lumi.png";
+const FIGMA_LEAF_TL = "/assets/splash-leaf-tl.png";
 
 interface SplashScreenProps {
   avatar: UseAkoolAvatarReturn;

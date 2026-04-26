@@ -90,12 +90,14 @@ function waitForVideoAndMarkPlaying(
 
 async function muteMic(client: RTCClient | null, mic: ILocalAudioTrack | null): Promise<void> {
   if (!mic) return;
+  console.log("[Akool] MUTING MIC - unpublishing from Agora");
   try { await mic.setEnabled(false); } catch { /* ignore */ }
   if (client) try { await client.unpublish(mic); } catch { /* already unpublished */ }
 }
 
 async function unmuteMic(client: RTCClient | null, mic: ILocalAudioTrack | null): Promise<void> {
   if (!mic) return;
+  console.log("[Akool] UNMUTING MIC - publishing to Agora");
   try { await mic.setEnabled(true); } catch { /* ignore */ }
   if (client) try { await client.publish(mic); } catch { /* already published */ }
 }
@@ -149,11 +151,13 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const isSpeakingRef = useRef(false);
   const speakingMuteRef = useRef(false);
   const unmutePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speakingGenerationRef = useRef(0); // Incremented each time TTS starts, prevents stale timeouts from unmuting
   const partialBotRef = useRef<string>("");
   const speechRecRef = useRef<any>(null);
   const lastTtsEndRef = useRef<number>(0);
   const recentBotTextsRef = useRef<string[]>([]);
   const suppressFirstResponseRef = useRef<boolean>(false);
+  const systemPromptUnmutePendingRef = useRef<boolean>(false); // Track if system prompt unmute was blocked by speaking
 
   const getToken = useCallback(async (): Promise<string | null> => {
     if (tokenRef.current) return tokenRef.current;
@@ -359,16 +363,27 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             if (status === "start" || status === "speaking") {
               isSpeakingRef.current = true;
               setIsSpeaking(true);
-              // Unpublish mic + stop browser STT so avatar audio can't trigger STT
-              if (!speakingMuteRef.current) {
-                speakingMuteRef.current = true;
-                muteMic(agoraClientRef.current, micTrackRef.current);
-                if (speechRecRef.current) {
-                  speechRecRef.current.onend = null;
-                  try { speechRecRef.current.stop(); } catch { /* already stopped */ }
-                }
-                setIsListening(false);
+              // Increment generation to invalidate any pending unmute timeouts
+              speakingGenerationRef.current++;
+              const currentGen = speakingGenerationRef.current;
+              // Cancel any pending unmute timeout
+              if (unmutePendingRef.current) {
+                clearTimeout(unmutePendingRef.current);
+                unmutePendingRef.current = null;
               }
+              // Unpublish mic + stop browser STT so avatar audio can't trigger STT
+              speakingMuteRef.current = true;
+              setIsListening(false);
+              // AGGRESSIVE: Always mute immediately, even if already muted
+              if (micTrackRef.current && agoraClientRef.current) {
+                muteMic(agoraClientRef.current, micTrackRef.current);
+              }
+              if (speechRecRef.current) {
+                speechRecRef.current.onend = null;
+                try { speechRecRef.current.stop(); } catch { /* already stopped */ }
+              }
+              // Log for debugging
+              console.log(`[Akool] TTS started - generation ${currentGen}, mic muted`);
             } else if (status === "end" || status === "done") {
               isSpeakingRef.current = false;
               setIsSpeaking(false);
@@ -377,15 +392,86 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               if (speakingMuteRef.current) {
                 speakingMuteRef.current = false;
                 if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+                const generationAtEnd = speakingGenerationRef.current;
                 unmutePendingRef.current = setTimeout(() => {
                   unmutePendingRef.current = null;
+                  // BLOCK: Do not unmute if avatar started speaking again
+                  if (isSpeakingRef.current) {
+                    console.log("[Akool] Post-TTS unmute blocked - avatar is speaking again");
+                    return;
+                  }
+                  // BLOCK: Do not unmute if generation changed (new TTS started)
+                  if (speakingGenerationRef.current !== generationAtEnd) {
+                    console.log(`[Akool] Post-TTS unmute blocked - generation mismatch (${generationAtEnd} vs ${speakingGenerationRef.current})`);
+                    return;
+                  }
                   unmuteMic(agoraClientRef.current, micTrackRef.current);
                   if (speechRecRef.current) {
-                    speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+                    speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
                     try { speechRecRef.current.start(); } catch { /* already running */ }
                   }
                   setIsListening(true);
                 }, 800);
+              }
+            }
+          }
+
+          // Audio events — fallback for when TTS events aren't sent by server
+          if (msg?.type === "event") {
+            const eventType = msg?.pld?.event ?? msg?.event;
+            if (eventType === "audio_start") {
+              // Only trigger if not already speaking
+              if (!isSpeakingRef.current) {
+                console.log("[Akool] Audio start detected (TTS fallback) - muting mic");
+                isSpeakingRef.current = true;
+                setIsSpeaking(true);
+                speakingGenerationRef.current++;
+                if (unmutePendingRef.current) {
+                  clearTimeout(unmutePendingRef.current);
+                  unmutePendingRef.current = null;
+                }
+                speakingMuteRef.current = true;
+                setIsListening(false);
+                if (micTrackRef.current && agoraClientRef.current) {
+                  muteMic(agoraClientRef.current, micTrackRef.current);
+                }
+                if (speechRecRef.current) {
+                  speechRecRef.current.onend = null;
+                  try { speechRecRef.current.stop(); } catch { /* already stopped */ }
+                }
+              }
+            } else if (eventType === "audio_end") {
+              // Only process if we were speaking OR if system prompt unmute is pending
+              const wasPending = systemPromptUnmutePendingRef.current;
+              if (isSpeakingRef.current || wasPending) {
+                console.log("[Akool] Audio end detected (TTS fallback) - will unmute shortly");
+                isSpeakingRef.current = false;
+                setIsSpeaking(false);
+                lastTtsEndRef.current = Date.now();
+                // Clear the pending flag since we're handling it now
+                systemPromptUnmutePendingRef.current = false;
+                if (speakingMuteRef.current || wasPending) {
+                  speakingMuteRef.current = false;
+                  if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+                  const generationAtEnd = speakingGenerationRef.current;
+                  unmutePendingRef.current = setTimeout(() => {
+                    unmutePendingRef.current = null;
+                    if (isSpeakingRef.current) {
+                      console.log("[Akool] Post-audio unmute blocked - avatar is speaking again");
+                      return;
+                    }
+                    if (speakingGenerationRef.current !== generationAtEnd) {
+                      console.log(`[Akool] Post-audio unmute blocked - generation mismatch`);
+                      return;
+                    }
+                    unmuteMic(agoraClientRef.current, micTrackRef.current);
+                    if (speechRecRef.current) {
+                      speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
+                      try { speechRecRef.current.start(); } catch { /* already running */ }
+                    }
+                    setIsListening(true);
+                  }, 800);
+                }
               }
             }
           }
@@ -399,9 +485,16 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             const trimmed = text.trim();
             const tLower = trimmed.toLowerCase();
 
+            // DEBUG: Always log ASR events
+            console.log(`[Akool] ASR received: "${trimmed}" | isSpeaking: ${isSpeakingRef.current} | isListening: ${isListening}`);
+
             // ECHO SUPPRESSION: Skip if avatar is currently speaking or recently finished
             if (isSpeakingRef.current) {
-              if (import.meta.env.DEV) console.log("[Akool] ASR suppressed - avatar speaking:", trimmed);
+              console.log(`[Akool] ASR BLOCKED - avatar is speaking: "${trimmed}"`);
+              // AGGRESSIVE: Re-mute mic immediately to ensure server STT stops receiving audio
+              if (micTrackRef.current && agoraClientRef.current) {
+                muteMic(agoraClientRef.current, micTrackRef.current);
+              }
               return;
             }
 
@@ -449,11 +542,25 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                   if (speakingMuteRef.current) {
                     speakingMuteRef.current = false;
                     if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+                    const generationAtEnd = speakingGenerationRef.current;
+                    systemPromptUnmutePendingRef.current = true;
                     unmutePendingRef.current = setTimeout(() => {
                       unmutePendingRef.current = null;
+                      // BLOCK: Do not unmute if avatar is speaking
+                      if (isSpeakingRef.current) {
+                        console.log("[Akool] System prompt unmute blocked - avatar is speaking, will retry on audio_end");
+                        return;
+                      }
+                      // BLOCK: Do not unmute if generation changed
+                      if (speakingGenerationRef.current !== generationAtEnd) {
+                        console.log(`[Akool] System prompt unmute blocked - generation mismatch`);
+                        return;
+                      }
+                      // Clear the pending flag since we're unmuting now
+                      systemPromptUnmutePendingRef.current = false;
                       unmuteMic(agoraClientRef.current, micTrackRef.current);
                       if (speechRecRef.current) {
-                        speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+                        speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
                         try { speechRecRef.current.start(); } catch { /* already running */ }
                       }
                       setIsListening(true);
@@ -484,6 +591,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                 // Do NOT reset isSpeakingRef here — TTS audio is still playing
                 // Only the TTS end/done event should clear speaking state
                 // Safety: if TTS end event never arrives, force-reset after 15s
+                const generationAtChatEnd = speakingGenerationRef.current;
                 setTimeout(() => {
                   if (isSpeakingRef.current) {
                     console.warn("[Akool] TTS end event not received — force-resetting speaking state");
@@ -492,12 +600,27 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                     lastTtsEndRef.current = Date.now();
                     if (speakingMuteRef.current) {
                       speakingMuteRef.current = false;
-                      micTrackRef.current?.setMuted(false).catch(() => {});
-                      if (speechRecRef.current) {
-                        speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
-                        try { speechRecRef.current.start(); } catch { /* already running */ }
-                      }
-                      setIsListening(true);
+                      if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
+                      unmutePendingRef.current = setTimeout(() => {
+                        unmutePendingRef.current = null;
+                        // BLOCK: Do not unmute if avatar is speaking
+                        if (isSpeakingRef.current) {
+                          console.log("[Akool] Safety timeout unmute blocked - avatar is speaking");
+                          return;
+                        }
+                        // BLOCK: Do not unmute if generation changed
+                        if (speakingGenerationRef.current !== generationAtChatEnd) {
+                          console.log(`[Akool] Safety timeout unmute blocked - generation mismatch`);
+                          return;
+                        }
+                        // Use unmuteMic for proper Agora publish flow
+                        unmuteMic(agoraClientRef.current, micTrackRef.current);
+                        if (speechRecRef.current) {
+                          speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
+                          try { speechRecRef.current.start(); } catch { /* already running */ }
+                        }
+                        setIsListening(true);
+                      }, 800);
                     }
                   }
                 }, 15000);
@@ -509,6 +632,10 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               // ECHO SUPPRESSION for chat user messages (same logic as ASR)
               if (isSpeakingRef.current) {
                 if (import.meta.env.DEV) console.log("[Akool] Chat user msg suppressed - avatar speaking:", trimmed);
+                // AGGRESSIVE: Re-mute mic immediately to ensure server STT stops receiving audio
+                if (micTrackRef.current && agoraClientRef.current) {
+                  muteMic(agoraClientRef.current, micTrackRef.current);
+                }
                 return;
               }
               if (Date.now() - lastTtsEndRef.current < 1500) {
@@ -566,6 +693,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
         console.warn("[Akool] Failed to send system prompt:", e);
       }
       // Safety: if system prompt chat fin never arrives, publish mic after 12s
+      const generationAtInit = speakingGenerationRef.current;
       setTimeout(() => {
         if (suppressFirstResponseRef.current) {
           suppressFirstResponseRef.current = false;
@@ -574,9 +702,19 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
         }
         if (speakingMuteRef.current) {
           speakingMuteRef.current = false;
+          // BLOCK: Do not unmute if avatar is speaking
+          if (isSpeakingRef.current) {
+            console.log("[Akool] System prompt timeout unmute blocked - avatar is speaking");
+            return;
+          }
+          // BLOCK: Do not unmute if generation changed
+          if (speakingGenerationRef.current !== generationAtInit) {
+            console.log(`[Akool] System prompt timeout unmute blocked - generation mismatch`);
+            return;
+          }
           unmuteMic(agoraClientRef.current, micTrackRef.current);
           if (speechRecRef.current) {
-            speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+            speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
             try { speechRecRef.current.start(); } catch { /* already running */ }
           }
           setIsListening(true);
@@ -638,7 +776,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             console.warn("[Akool] Browser STT error:", e.error);
           }
         };
-        rec.onend = () => { if (speechRecRef.current) rec.start(); };
+        rec.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) rec.start(); };
         speechRecRef.current = rec;
         rec.start();
         console.log("[Akool] Browser STT shadow started for chat log/navigation");
@@ -711,15 +849,25 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     if (mode !== "streaming" || !client) return;
     isSpeakingRef.current = true;
     setIsSpeaking(true);
+    // Increment generation and cancel any pending unmutes
+    speakingGenerationRef.current++;
+    const speakGeneration = speakingGenerationRef.current;
+    if (unmutePendingRef.current) {
+      clearTimeout(unmutePendingRef.current);
+      unmutePendingRef.current = null;
+    }
+    console.log(`[Akool] speak() started - generation ${speakGeneration}`);
     // Unpublish mic immediately — republish happens when TTS end event arrives
-    if (!speakingMuteRef.current) {
-      speakingMuteRef.current = true;
-      muteMic(agoraClientRef.current, micTrackRef.current);
-      if (speechRecRef.current) {
-        speechRecRef.current.onend = null;
-        try { speechRecRef.current.stop(); } catch { /* already stopped */ }
-      }
-      setIsListening(false);
+    speakingMuteRef.current = true;
+    setIsListening(false);
+    // AGGRESSIVE: Ensure mic is fully unpublished before sending TTS
+    await muteMic(agoraClientRef.current, micTrackRef.current);
+    // Small delay to ensure mute propagates to server
+    await new Promise(r => setTimeout(r, 100));
+    console.log(`[Akool] Mic muted, sending TTS...`);
+    if (speechRecRef.current) {
+      speechRecRef.current.onend = null;
+      try { speechRecRef.current.stop(); } catch { /* already stopped */ }
     }
     try {
       await sendChunked(client, text, "tts");
@@ -734,9 +882,19 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
           unmutePendingRef.current = setTimeout(() => {
             unmutePendingRef.current = null;
+            // BLOCK: Do not unmute if avatar is speaking
+            if (isSpeakingRef.current) {
+              console.log("[Akool] Speak timeout unmute blocked - avatar is speaking");
+              return;
+            }
+            // BLOCK: Do not unmute if generation changed
+            if (speakingGenerationRef.current !== speakGeneration) {
+              console.log(`[Akool] Speak timeout unmute blocked - generation mismatch`);
+              return;
+            }
             unmuteMic(agoraClientRef.current, micTrackRef.current);
             if (speechRecRef.current) {
-              speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+              speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
               try { speechRecRef.current.start(); } catch { /* already running */ }
             }
             setIsListening(true);
@@ -748,23 +906,41 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       isSpeakingRef.current = false;
       setIsSpeaking(false);
       speakingMuteRef.current = false;
-      unmuteMic(agoraClientRef.current, micTrackRef.current);
-      if (speechRecRef.current) {
-        speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
-        try { speechRecRef.current.start(); } catch { /* already running */ }
+      // CRITICAL: Check generation before unmuting - new TTS may have started during error handling
+      if (speakingGenerationRef.current !== speakGeneration) {
+        console.log("[Akool] Speak catch blocked - new generation started during error");
+        return;
       }
-      setIsListening(true);
+      // Only unmute if not speaking again
+      if (!isSpeakingRef.current) {
+        unmuteMic(agoraClientRef.current, micTrackRef.current);
+        if (speechRecRef.current) {
+          speechRecRef.current.onend = () => { if (speechRecRef.current && !isSpeakingRef.current) speechRecRef.current.start(); };
+          try { speechRecRef.current.start(); } catch { /* already running */ }
+        }
+        setIsListening(true);
+      }
     }
   }, [mode]);
 
   // startListening: republish mic so Akool STT picks up the user, resume browser STT shadow
   const startListening = useCallback(async () => {
+    // BLOCK: Do not enable listening if avatar is currently speaking
+    if (isSpeakingRef.current) {
+      console.log("[Akool] startListening blocked - avatar is speaking");
+      return;
+    }
     const mic = micTrackRef.current;
     if (mic) {
       try { await unmuteMic(agoraClientRef.current, mic); } catch (e) { console.warn("[Akool] republish mic failed:", e); }
     }
     if (speechRecRef.current) {
       try { speechRecRef.current.start(); } catch { /* already running */ }
+    }
+    // CRITICAL: Double-check speaking state before setting isListening
+    if (isSpeakingRef.current) {
+      console.log("[Akool] startListening: BLOCKED at end - avatar started speaking during unmute");
+      return;
     }
     setIsListening(true);
   }, []);
@@ -776,7 +952,12 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     if (speechRecRef.current) {
       speechRecRef.current.onend = null;
       try { speechRecRef.current.stop(); } catch { /* already stopped */ }
-      speechRecRef.current.onend = () => { if (speechRecRef.current) speechRecRef.current.start(); };
+      // NEVER auto-restart if avatar is speaking - check isSpeakingRef
+      speechRecRef.current.onend = () => {
+        if (speechRecRef.current && !isSpeakingRef.current) {
+          speechRecRef.current.start();
+        }
+      };
     }
     setIsListening(false);
   }, []);
