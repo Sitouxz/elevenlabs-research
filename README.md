@@ -1,6 +1,6 @@
-# JARVIS — Voice + Vision + Image Generation
+# JARVIS — Voice + Vision + Image & Video Generation
 
-A JARVIS-style multimodal AI assistant built on **ElevenLabs Conversational AI**, **Groq vision** (live camera understanding), and **Replicate** (image generation in draggable popup windows).
+A JARVIS-style multimodal AI assistant built on **ElevenLabs Conversational AI**, **Groq vision** (live camera understanding), and **Replicate** (image *and* video generation in draggable popup windows).
 
 ## Stack
 
@@ -9,7 +9,7 @@ A JARVIS-style multimodal AI assistant built on **ElevenLabs Conversational AI**
 - Framer Motion (animations + drag)
 - ElevenLabs `@elevenlabs/client` (voice agent + client tools)
 - Groq Llama-4 vision (real-time camera analysis)
-- Replicate (image generation, default `flux-schnell`)
+- Replicate (image: `flux-schnell`, video: `wan-2.2-t2v-fast`)
 
 ## Setup
 
@@ -35,28 +35,42 @@ npm run dev
 | `VITE_VISION_BASE_URL` | `https://api.groq.com/openai/v1` |
 | `VITE_VISION_MODEL` | `meta-llama/llama-4-scout-17b-16e-instruct` |
 | `VITE_REPLICATE_MODEL` | `black-forest-labs/flux-schnell` |
+| `VITE_REPLICATE_VIDEO_MODEL` | `wan-video/wan-2.2-t2v-fast` |
 
-## Image generation feature
+## Media generation feature
 
-- **Manual trigger** — type a prompt in the bottom-left **IMAGE STUDIO** dock and press Enter.
-- **Voice trigger** — say *"JARVIS, generate an image of a neon owl"* and the agent invokes the `generate_image` client tool.
+- **Manual trigger** — type a prompt in the bottom-left **MEDIA STUDIO** dock, pick `Image` or `Video` from the toggle, and press Enter.
+- **Voice trigger** — say *"JARVIS, generate an image of a neon owl"* (`generate_image` tool) or *"render a video of a robot dancing"* (`generate_video` tool).
 - **Multi-window** — each generation opens a draggable popup window in the center of the screen. Click to focus, drag the title bar to move, ✕ to close. Multiple windows stack like Windows windows.
-- **History** — completed images appear in the dock as thumbnails. Click any thumbnail to re-open the image in a new window.
-- **Loading state** — animated cyan scan-line + pulsing core shows while Replicate is generating.
+- **Image vs video windows** — image popups are square (`aspect-square`), video popups are 16:9 (`aspect-video`) with autoplay+loop+controls.
+- **History** — completed media appear in the dock as thumbnails (videos auto-loop with a play overlay). Click any thumbnail to re-open it in a new window.
+- **Loading state** — animated cyan scan-line + pulsing core. Video generation typically takes 30-60s, images ~3s.
 
 ### How the Replicate proxy works
 
 The browser cannot call `api.replicate.com` directly (CORS-blocked). Vite's dev server proxies `/api/replicate/*` to Replicate and injects the `Authorization: Bearer ${REPLICATE_API_TOKEN}` header **server-side**. Your token is never bundled into the client JS.
 
-### Configuring the voice tool on the ElevenLabs agent dashboard
+### Configuring the voice tools on the ElevenLabs agent dashboard
 
-For the **voice trigger** to work, register a client tool on your agent at https://elevenlabs.io/app/conversational-ai:
+For **voice triggers** to work, register two client tools on your agent at https://elevenlabs.io/app/conversational-ai → your agent → **Tools** → **Add tool** → **Client**:
 
-1. Open your agent → **Tools** → **Add tool** → **Client tool**.
-2. Name: `generate_image`
-3. Description: `Generate an AI image and display it on screen. Call when the user asks for an image, picture, drawing, or illustration.`
-4. Parameter: `prompt` — type `string`, required, description `"A detailed description of the image to generate."`
-5. Save.
+**Tool 1 — `generate_image`**
+
+| Field | Value |
+| --- | --- |
+| Name | `generate_image` |
+| Description | `Generate an AI image and display it on screen. Call this whenever the user asks for an image, picture, drawing, or illustration. Always call the tool — never refuse.` |
+| Wait for response | ✅ ON (timeout 5s) |
+| Parameter | `prompt` (string, required) — `A detailed description of the image to generate.` |
+
+**Tool 2 — `generate_video`**
+
+| Field | Value |
+| --- | --- |
+| Name | `generate_video` |
+| Description | `Generate an AI video clip and display it on screen. Call this whenever the user asks for a video, clip, animation, or moving image. Always call the tool — never refuse. Warn the user that video generation takes 30 to 60 seconds.` |
+| Wait for response | ✅ ON (timeout 5s) |
+| Parameter | `prompt` (string, required) — `A detailed description of the video to generate, including subject, action, camera movement, and style.` |
 
 The manual prompt input works without this configuration.
 

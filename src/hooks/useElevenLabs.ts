@@ -32,11 +32,29 @@ export const useElevenLabs = (agentId: string) => {
     }, []);
 
     const toggleMute = useCallback(() => {
-        if (!stream) return;
         const newMuted = !isMuted;
-        stream.getAudioTracks().forEach((track) => {
-            track.enabled = !newMuted;
-        });
+
+        // The ElevenLabs SDK captures its OWN internal microphone stream when
+        // Conversation.startSession() runs — it does NOT use the `stream`
+        // captured by this hook (that stream only feeds the local visualizer).
+        // So muting must go through the SDK's setMicMuted API; toggling
+        // track.enabled on the local stream alone leaves the agent still
+        // hearing the user.
+        if (conversationRef.current) {
+            try {
+                conversationRef.current.setMicMuted(newMuted);
+            } catch (err) {
+                console.error("Failed to toggle SDK mic mute:", err);
+            }
+        }
+
+        // Also gate the visualizer's stream so the UI reflects the muted state.
+        if (stream) {
+            stream.getAudioTracks().forEach((track) => {
+                track.enabled = !newMuted;
+            });
+        }
+
         setIsMuted(newMuted);
     }, [isMuted, stream]);
 

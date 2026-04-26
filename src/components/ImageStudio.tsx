@@ -1,13 +1,25 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useState, type KeyboardEvent } from "react";
-import { Sparkles, Send, ImageIcon, History, Trash2 } from "lucide-react";
-import type { ImageHistoryItem } from "../hooks/useImageGeneration";
+import {
+    Sparkles,
+    Send,
+    ImageIcon,
+    Film,
+    History,
+    Trash2,
+    Play,
+} from "lucide-react";
+import type {
+    ImageHistoryItem,
+    MediaType,
+} from "../hooks/useImageGeneration";
 
 interface ImageStudioProps {
     history: ImageHistoryItem[];
     activeCount: number;
-    model: string;
-    onGenerate: (prompt: string) => void;
+    imageModel: string;
+    videoModel: string;
+    onGenerate: (prompt: string, mediaType: MediaType) => void;
     onReopen: (item: ImageHistoryItem) => void;
     onClearHistory: () => void;
 }
@@ -15,20 +27,22 @@ interface ImageStudioProps {
 export const ImageStudio = ({
     history,
     activeCount,
-    model,
+    imageModel,
+    videoModel,
     onGenerate,
     onReopen,
     onClearHistory,
 }: ImageStudioProps) => {
     const [prompt, setPrompt] = useState("");
     const [isExpanded, setIsExpanded] = useState(true);
+    const [mediaType, setMediaType] = useState<MediaType>("image");
 
     const submit = useCallback(() => {
         const trimmed = prompt.trim();
         if (!trimmed) return;
-        onGenerate(trimmed);
+        onGenerate(trimmed, mediaType);
         setPrompt("");
-    }, [prompt, onGenerate]);
+    }, [prompt, mediaType, onGenerate]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         // Enter submits, Shift+Enter inserts a newline
@@ -38,7 +52,9 @@ export const ImageStudio = ({
         }
     };
 
-    const modelShort = model.split("/").pop() || model;
+    const activeModel = mediaType === "video" ? videoModel : imageModel;
+    const modelShort = activeModel.split("/").pop() || activeModel;
+    const isVideoMode = mediaType === "video";
 
     return (
         <motion.div
@@ -58,7 +74,7 @@ export const ImageStudio = ({
                         className="text-primary animate-pulse"
                     />
                     <h2 className="text-xs font-mono font-bold tracking-widest text-primary/80">
-                        IMAGE STUDIO
+                        MEDIA STUDIO
                     </h2>
                     {activeCount > 0 && (
                         <span className="text-[9px] font-mono text-primary bg-primary/10 border border-primary/30 rounded px-1.5 py-0.5">
@@ -86,6 +102,34 @@ export const ImageStudio = ({
                     >
                         {/* Prompt input */}
                         <div className="p-4 space-y-3">
+                            {/* Image / Video segmented toggle */}
+                            <div className="flex bg-background-dark/60 border border-primary/20 rounded-lg p-0.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setMediaType("image")}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all ${
+                                        !isVideoMode
+                                            ? "bg-primary/15 text-primary shadow-[0_0_10px_rgba(0,238,255,0.3)]"
+                                            : "text-primary/40 hover:text-primary/70"
+                                    }`}
+                                >
+                                    <ImageIcon size={11} />
+                                    Image
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMediaType("video")}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all ${
+                                        isVideoMode
+                                            ? "bg-primary/15 text-primary shadow-[0_0_10px_rgba(0,238,255,0.3)]"
+                                            : "text-primary/40 hover:text-primary/70"
+                                    }`}
+                                >
+                                    <Film size={11} />
+                                    Video
+                                </button>
+                            </div>
+
                             <div className="relative">
                                 <textarea
                                     value={prompt}
@@ -93,7 +137,11 @@ export const ImageStudio = ({
                                         setPrompt(e.target.value)
                                     }
                                     onKeyDown={handleKeyDown}
-                                    placeholder="Describe an image to generate…"
+                                    placeholder={
+                                        isVideoMode
+                                            ? "Describe a video to generate…"
+                                            : "Describe an image to generate…"
+                                    }
                                     rows={3}
                                     className="w-full bg-background-dark/60 border border-primary/20 focus:border-primary/60 focus:shadow-[0_0_15px_rgba(0,238,255,0.2)] rounded-lg px-3 py-2 text-sm text-gray-100 font-light placeholder-primary/30 resize-none outline-none transition-all"
                                 />
@@ -104,10 +152,17 @@ export const ImageStudio = ({
 
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                    <ImageIcon
-                                        size={10}
-                                        className="text-primary/40 flex-shrink-0"
-                                    />
+                                    {isVideoMode ? (
+                                        <Film
+                                            size={10}
+                                            className="text-primary/40 flex-shrink-0"
+                                        />
+                                    ) : (
+                                        <ImageIcon
+                                            size={10}
+                                            className="text-primary/40 flex-shrink-0"
+                                        />
+                                    )}
                                     <span className="text-[9px] font-mono text-primary/40 uppercase truncate">
                                         {modelShort}
                                     </span>
@@ -124,7 +179,7 @@ export const ImageStudio = ({
                                     }`}
                                 >
                                     <Send size={11} />
-                                    Generate
+                                    {isVideoMode ? "Render" : "Generate"}
                                 </motion.button>
                             </div>
                         </div>
@@ -159,35 +214,59 @@ export const ImageStudio = ({
 
                             {history.length === 0 ? (
                                 <div className="text-[10px] font-mono text-primary/20 italic py-2 text-center">
-                                    No images yet
+                                    Nothing generated yet
                                 </div>
                             ) : (
                                 <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
-                                    {history.map((item) => (
-                                        <motion.button
-                                            key={item.id}
-                                            initial={{
-                                                opacity: 0,
-                                                scale: 0.8,
-                                            }}
-                                            animate={{
-                                                opacity: 1,
-                                                scale: 1,
-                                            }}
-                                            whileHover={{ scale: 1.05 }}
-                                            onClick={() => onReopen(item)}
-                                            title={item.prompt}
-                                            className="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-primary/20 hover:border-primary hover:shadow-[0_0_12px_rgba(0,238,255,0.5)] transition-all group/thumb"
-                                        >
-                                            <img
-                                                src={item.imageUrl}
-                                                alt={item.prompt}
-                                                className="w-full h-full object-cover"
-                                                draggable={false}
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
-                                        </motion.button>
-                                    ))}
+                                    {history.map((item) => {
+                                        const itemIsVideo =
+                                            item.mediaType === "video";
+                                        return (
+                                            <motion.button
+                                                key={item.id}
+                                                initial={{
+                                                    opacity: 0,
+                                                    scale: 0.8,
+                                                }}
+                                                animate={{
+                                                    opacity: 1,
+                                                    scale: 1,
+                                                }}
+                                                whileHover={{ scale: 1.05 }}
+                                                onClick={() => onReopen(item)}
+                                                title={item.prompt}
+                                                className="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-primary/20 hover:border-primary hover:shadow-[0_0_12px_rgba(0,238,255,0.5)] transition-all group/thumb"
+                                            >
+                                                {itemIsVideo ? (
+                                                    <video
+                                                        src={item.imageUrl}
+                                                        className="w-full h-full object-cover"
+                                                        muted
+                                                        autoPlay
+                                                        loop
+                                                        playsInline
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        src={item.imageUrl}
+                                                        alt={item.prompt}
+                                                        className="w-full h-full object-cover"
+                                                        draggable={false}
+                                                    />
+                                                )}
+                                                {itemIsVideo && (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover/thumb:bg-black/10 transition-colors">
+                                                        <Play
+                                                            size={14}
+                                                            className="text-primary drop-shadow-[0_0_4px_#00eeff]"
+                                                            fill="currentColor"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+                                            </motion.button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

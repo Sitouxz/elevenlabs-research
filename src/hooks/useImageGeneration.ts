@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 // ---------------------------------------------------------------------------
-// Replicate image generation hook
+// Replicate media (image + video) generation hook
 //
 // Architecture:
 //   browser -> /api/replicate/* (Vite dev proxy) -> https://api.replicate.com/v1/*
@@ -14,13 +14,29 @@ import { useState, useCallback, useRef, useEffect } from "react";
 //
 // We send the `Prefer: wait=60` header on the initial POST so fast models
 // (e.g. flux-schnell) return the finished prediction in a single round trip.
-// Slower models fall back to short-interval polling.
+// Slower models (especially video) fall back to short-interval polling.
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MODEL =
+export type MediaType = "image" | "video";
+
+const IMAGE_MODEL =
     import.meta.env.VITE_REPLICATE_MODEL || "black-forest-labs/flux-schnell";
+const VIDEO_MODEL =
+    import.meta.env.VITE_REPLICATE_VIDEO_MODEL ||
+    "wan-video/wan-2.2-t2v-fast";
+
+const MODEL_BY_TYPE: Record<MediaType, string> = {
+    image: IMAGE_MODEL,
+    video: VIDEO_MODEL,
+};
+
 const POLL_INTERVAL_MS = 800;
-const MAX_POLL_MS = 90_000;
+// Image generations should complete in <90s. Video models routinely take
+// 1-2 minutes, sometimes more for higher-quality models.
+const MAX_POLL_MS_BY_TYPE: Record<MediaType, number> = {
+    image: 90_000,
+    video: 300_000,
+};
 
 const WINDOW_WIDTH = 512;
 const WINDOW_HEIGHT = 600; // body 512 + header/footer ~88
@@ -34,9 +50,10 @@ export type WindowStatus =
 
 export interface ImageWindow {
     id: string;
+    mediaType: MediaType;
     prompt: string;
     status: WindowStatus;
-    imageUrl?: string;
+    imageUrl?: string; // Either an image URL or an mp4 URL depending on mediaType
     error?: string;
     predictionId?: string;
     createdAt: number;
@@ -47,6 +64,7 @@ export interface ImageWindow {
 
 export interface ImageHistoryItem {
     id: string;
+    mediaType: MediaType;
     prompt: string;
     imageUrl: string;
     createdAt: number;
@@ -106,13 +124,15 @@ export const useImageGeneration = () => {
         (
             windowId: string,
             predictionId: string,
-            startedAt: number
+            startedAt: number,
+            mediaType: MediaType
         ) => {
+            const maxPollMs = MAX_POLL_MS_BY_TYPE[mediaType];
             const tick = async () => {
-                if (Date.now() - startedAt > MAX_POLL_MS) {
+                if (Date.now() - startedAt > maxPollMs) {
                     patchWindow(windowId, {
                         status: "failed",
-                        error: "Timed out after 90s",
+                        error: `Timed out after ${Math.round(maxPollMs / 1000)}s`,
                     });
                     activePollsRef.current.delete(windowId);
                     return;
@@ -179,7 +199,7 @@ export const useImageGeneration = () => {
                 if (!url) {
                     patchWindow(windowId, {
                         status: "failed",
-                        error: "No image URL returned",
+                        error: "No media URL returned",
                     });
                     return;
                 }
@@ -198,6 +218,7 @@ export const useImageGeneration = () => {
                     );
                     const item: ImageHistoryItem = {
                         id: windowId,
+                        mediaType: win?.mediaType || "image",
                         prompt: win?.prompt || "(no prompt)",
                         imageUrl: url,
                         createdAt: Date.now(),
@@ -222,7 +243,7 @@ export const useImageGeneration = () => {
     // Public: kick off a new generation. Returns the windowId.
     // -----------------------------------------------------------------------
     const generate = useCallback(
-        (prompt: string): string => {
+        (prompt: string, mediaType: MediaType = "image"): string => {
             const trimmed = prompt.trim();
             if (!trimmed) return "";
 
@@ -237,6 +258,7 @@ export const useImageGeneration = () => {
 
             const newWindow: ImageWindow = {
                 id,
+                mediaType,
                 prompt: trimmed,
                 status: "loading",
                 createdAt: Date.now(),
@@ -247,7 +269,7 @@ export const useImageGeneration = () => {
             setWindows((prev) => [...prev, newWindow]);
             setError("");
 
-            const { owner, name } = parseModel(DEFAULT_MODEL);
+            const { owner, name } = parseModel(MODEL_BY_TYPE[mediaType]);
             const startedAt = Date.now();
 
             (async () => {
@@ -260,6 +282,8 @@ export const useImageGeneration = () => {
                                 "Content-Type": "application/json",
                                 // Block up to 60s on the initial POST so fast
                                 // models return without us needing to poll.
+                                // Video models almost always exceed 60s, so
+                                // they fall through to polling.
                                 Prefer: "wait=60",
                             },
                             body: JSON.stringify({
@@ -296,7 +320,7 @@ export const useImageGeneration = () => {
                         data?.status === "processing"
                     ) {
                         if (data?.id) {
-                            pollPrediction(id, data.id, startedAt);
+                            pollPrediction(id, data.id, startedAt, mediaType);
                         } else {
                             patchWindow(id, {
                                 status: "failed",
@@ -362,6 +386,7 @@ export const useImageGeneration = () => {
 
             const newWindow: ImageWindow = {
                 id,
+                mediaType: item.mediaType,
                 prompt: item.prompt,
                 status: "succeeded",
                 imageUrl: item.imageUrl,
@@ -393,7 +418,8 @@ export const useImageGeneration = () => {
         windows,
         history,
         error,
-        model: DEFAULT_MODEL,
+        imageModel: IMAGE_MODEL,
+        videoModel: VIDEO_MODEL,
         generate,
         closeWindow,
         focusWindow,

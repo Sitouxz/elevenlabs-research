@@ -7,6 +7,7 @@ import {
     Copy,
     AlertCircle,
     Sparkles,
+    Film,
     GripVertical,
 } from "lucide-react";
 import type { ImageWindow as ImageWindowType } from "../hooks/useImageGeneration";
@@ -47,6 +48,8 @@ export const ImageWindow = ({
         });
     };
 
+    const isVideo = w.mediaType === "video";
+
     const handleDownload = async () => {
         if (!w.imageUrl) return;
         try {
@@ -55,7 +58,7 @@ export const ImageWindow = ({
             const objUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = objUrl;
-            a.download = `jarvis-${w.id.slice(0, 8)}.png`;
+            a.download = `jarvis-${w.id.slice(0, 8)}.${isVideo ? "mp4" : "png"}`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -124,10 +127,17 @@ export const ImageWindow = ({
                         size={12}
                         className="text-primary/40 flex-shrink-0"
                     />
-                    <Sparkles
-                        size={12}
-                        className="text-primary flex-shrink-0"
-                    />
+                    {isVideo ? (
+                        <Film
+                            size={12}
+                            className="text-primary flex-shrink-0"
+                        />
+                    ) : (
+                        <Sparkles
+                            size={12}
+                            className="text-primary flex-shrink-0"
+                        />
+                    )}
                     <span className="text-[10px] font-mono text-primary/80 uppercase tracking-wider truncate">
                         {truncatedPrompt}
                     </span>
@@ -137,14 +147,14 @@ export const ImageWindow = ({
                         <>
                             <button
                                 onClick={handleCopyUrl}
-                                title="Copy image URL"
+                                title="Copy URL"
                                 className="w-6 h-6 rounded flex items-center justify-center text-primary/60 hover:text-primary hover:bg-primary/10 transition"
                             >
                                 <Copy size={12} />
                             </button>
                             <button
                                 onClick={handleDownload}
-                                title="Download image"
+                                title={isVideo ? "Download video" : "Download image"}
                                 className="w-6 h-6 rounded flex items-center justify-center text-primary/60 hover:text-primary hover:bg-primary/10 transition"
                             >
                                 <Download size={12} />
@@ -162,7 +172,9 @@ export const ImageWindow = ({
             </div>
 
             {/* Body */}
-            <div className="relative aspect-square bg-black/70 overflow-hidden">
+            <div
+                className={`relative ${isVideo ? "aspect-video" : "aspect-square"} bg-black/70 overflow-hidden`}
+            >
                 {/* Loading state */}
                 {w.status === "loading" && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -202,10 +214,12 @@ export const ImageWindow = ({
                         {/* Caption */}
                         <div className="relative z-10 mt-6 text-center px-6">
                             <p className="text-[10px] font-mono text-primary tracking-[0.3em] uppercase animate-pulse">
-                                Generating
+                                {isVideo ? "Rendering Video" : "Generating"}
                             </p>
                             <p className="text-xs font-mono text-primary/40 mt-1">
-                                via Replicate
+                                {isVideo
+                                    ? "This may take 30\u201360s\u2026"
+                                    : "via Replicate"}
                             </p>
                             <p className="text-sm text-gray-300 font-light mt-3 leading-relaxed line-clamp-3">
                                 "{w.prompt}"
@@ -216,25 +230,37 @@ export const ImageWindow = ({
 
                 {/* Success state */}
                 {w.status === "succeeded" && w.imageUrl && (
-                    <motion.img
-                        initial={{ opacity: 0, scale: 1.05 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.4 }}
-                        src={w.imageUrl}
-                        alt={w.prompt}
-                        className="w-full h-full object-cover"
-                        draggable={false}
-                    />
+                    isVideo ? (
+                        <motion.video
+                            initial={{ opacity: 0, scale: 1.05 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4 }}
+                            src={w.imageUrl}
+                            controls
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover bg-black"
+                        />
+                    ) : (
+                        <motion.img
+                            initial={{ opacity: 0, scale: 1.05 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4 }}
+                            src={w.imageUrl}
+                            alt={w.prompt}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                        />
+                    )
                 )}
 
                 {/* Failure state */}
                 {(w.status === "failed" || w.status === "canceled") && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
                         <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/40 flex items-center justify-center mb-3">
-                            <AlertCircle
-                                size={26}
-                                className="text-red-400"
-                            />
+                            <AlertCircle size={26} className="text-red-400" />
                         </div>
                         <p className="text-[10px] font-mono text-red-400 uppercase tracking-wider mb-2">
                             {w.status === "canceled"
@@ -250,21 +276,27 @@ export const ImageWindow = ({
 
             {/* Footer / status bar */}
             <div className="flex items-center justify-between px-3 py-1.5 border-t border-primary/20 bg-background-dark/60 text-[9px] font-mono">
-                <span
-                    className={
-                        w.status === "loading"
-                            ? "text-primary/60"
+                <div className="flex items-center gap-2">
+                    <span
+                        className={
+                            w.status === "loading"
+                                ? "text-primary/60"
+                                : w.status === "succeeded"
+                                  ? "text-green-400/80"
+                                  : "text-red-400/80"
+                        }
+                    >
+                        {w.status === "loading"
+                            ? "PROCESSING\u2026"
                             : w.status === "succeeded"
-                              ? "text-green-400/80"
-                              : "text-red-400/80"
-                    }
-                >
-                    {w.status === "loading"
-                        ? "PROCESSING…"
-                        : w.status === "succeeded"
-                          ? "READY"
-                          : w.status.toUpperCase()}
-                </span>
+                              ? "READY"
+                              : w.status.toUpperCase()}
+                    </span>
+                    <span className="text-primary/30">•</span>
+                    <span className="text-primary/40 uppercase">
+                        {isVideo ? "VIDEO" : "IMAGE"}
+                    </span>
+                </div>
                 <span className="text-primary/30">
                     {new Date(w.createdAt).toLocaleTimeString()}
                 </span>

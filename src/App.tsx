@@ -53,13 +53,22 @@ function App() {
         if (!promptStr) {
           return "I need a description of the image you'd like me to create.";
         }
-        generateRef.current(promptStr);
+        generateRef.current(promptStr, "image");
         return `Generating an image of ${promptStr}. It will appear on screen in a moment.`;
+      },
+      generate_video: ({ prompt }) => {
+        console.log("[JARVIS tool] generate_video invoked with:", prompt);
+        const promptStr = typeof prompt === "string" ? prompt.trim() : "";
+        if (!promptStr) {
+          return "I need a description of the video you'd like me to create.";
+        }
+        generateRef.current(promptStr, "video");
+        return `Rendering a video of ${promptStr}. This usually takes 30 to 60 seconds — it will appear on screen when ready.`;
       },
     });
     console.log(
-      "[JARVIS] Client tools registered: generate_image. " +
-      "NOTE: For voice triggers to work, this tool must ALSO be declared " +
+      "[JARVIS] Client tools registered: generate_image, generate_video. " +
+      "NOTE: For voice triggers to work, both tools must ALSO be declared " +
       "on the agent dashboard. See README for instructions."
     );
   }, [registerClientTools]);
@@ -219,7 +228,8 @@ function App() {
             <ImageStudio
               history={imageGen.history}
               activeCount={imageGen.windows.length}
-              model={imageGen.model}
+              imageModel={imageGen.imageModel}
+              videoModel={imageGen.videoModel}
               onGenerate={imageGen.generate}
               onReopen={imageGen.reopenFromHistory}
               onClearHistory={imageGen.clearHistory}
