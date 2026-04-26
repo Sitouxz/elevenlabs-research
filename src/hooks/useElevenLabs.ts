@@ -1,6 +1,15 @@
 import { useState, useCallback, useRef } from "react";
 import { Conversation } from "@elevenlabs/client";
 
+// Type signature for client-tool handlers registered with the agent.
+// ElevenLabs client tools are async functions that receive structured args
+// (parsed from the agent's tool call) and return a string the agent reads back.
+export type ClientToolHandler = (
+    parameters: Record<string, unknown>
+) => Promise<string> | string;
+
+export type ClientToolMap = Record<string, ClientToolHandler>;
+
 export const useElevenLabs = (agentId: string) => {
     const [isConnected, setIsConnected] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -12,6 +21,15 @@ export const useElevenLabs = (agentId: string) => {
     const conversationRef = useRef<Conversation | null>(null);
     const isConnectedRef = useRef(false);
     const streamRef = useRef<MediaStream | null>(null);
+
+    // Client tools registered before startConversation() — read at session
+    // start so the agent can invoke them. Stored in a ref so updates from the
+    // App don't restart the session.
+    const clientToolsRef = useRef<ClientToolMap>({});
+
+    const registerClientTools = useCallback((tools: ClientToolMap) => {
+        clientToolsRef.current = { ...clientToolsRef.current, ...tools };
+    }, []);
 
     const toggleMute = useCallback(() => {
         if (!stream) return;
@@ -57,6 +75,34 @@ export const useElevenLabs = (agentId: string) => {
 
             const sessionOptions: any = {
                 agentId: agentId,
+                // Wrap each registered handler so the latest version (from the
+                // ref) is invoked at call time. This lets the App swap the
+                // implementation without restarting the conversation.
+                clientTools: Object.fromEntries(
+                    Object.keys(clientToolsRef.current).map((name) => [
+                        name,
+                        async (params: Record<string, unknown>) => {
+                            const fn = clientToolsRef.current[name];
+                            if (!fn) {
+                                return `Tool ${name} is not available right now.`;
+                            }
+                            try {
+                                const result = await fn(params || {});
+                                return typeof result === "string"
+                                    ? result
+                                    : JSON.stringify(result);
+                            } catch (err: any) {
+                                console.error(
+                                    `Client tool ${name} failed:`,
+                                    err
+                                );
+                                return `Tool ${name} failed: ${
+                                    err?.message || "unknown error"
+                                }`;
+                            }
+                        },
+                    ])
+                ),
                 onConnect: () => {
                     isConnectedRef.current = true;
                     setIsConnected(true);
@@ -152,5 +198,6 @@ export const useElevenLabs = (agentId: string) => {
         toggleMute,
         interrupt,
         sendContextualUpdate,
+        registerClientTools,
     };
 };

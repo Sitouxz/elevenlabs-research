@@ -1,5 +1,18 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Camera, CameraOff, Loader2, Eye, AlertCircle } from "lucide-react";
+import {
+    motion,
+    AnimatePresence,
+    useDragControls,
+    type PanInfo,
+} from "framer-motion";
+import {
+    Camera,
+    CameraOff,
+    Loader2,
+    Eye,
+    AlertCircle,
+    GripVertical,
+} from "lucide-react";
+import { useRef, useState } from "react";
 import type { VisionResult } from "../hooks/useVision";
 
 interface CameraFeedProps {
@@ -12,6 +25,24 @@ interface CameraFeedProps {
     onToggleCamera: () => void;
 }
 
+const PANEL_WIDTH = 280;
+const PANEL_RIGHT_MARGIN = 40;
+
+const computeInitialPosition = () => {
+    if (typeof window === "undefined") {
+        return { x: 200, y: 120 };
+    }
+    // Default spawn: right edge of the viewport, vertically centered — roughly
+    // mirrors where the panel used to sit inline next to the Visualizer.
+    return {
+        x: Math.max(
+            16,
+            window.innerWidth - PANEL_WIDTH - PANEL_RIGHT_MARGIN
+        ),
+        y: Math.max(120, Math.round(window.innerHeight / 2 - 240)),
+    };
+};
+
 export const CameraFeed = ({
     isCameraOn,
     isAnalyzing,
@@ -21,23 +52,82 @@ export const CameraFeed = ({
     videoRef,
     onToggleCamera,
 }: CameraFeedProps) => {
+    const dragControls = useDragControls();
+    const [pos, setPos] = useState(computeInitialPosition);
+    const startPosRef = useRef(pos);
+    const [zIndex, setZIndex] = useState(30);
+
+    const handleDragStart = () => {
+        startPosRef.current = pos;
+        // Raise above image windows on focus (image windows spawn around 100+)
+        setZIndex((z) => z + 1);
+    };
+
+    const handleDragEnd = (
+        _e: MouseEvent | TouchEvent | PointerEvent,
+        info: PanInfo
+    ) => {
+        setPos({
+            x: startPosRef.current.x + info.offset.x,
+            y: startPosRef.current.y + info.offset.y,
+        });
+    };
+
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="glass-panel rounded-xl overflow-hidden relative group"
-            style={{ width: 280 }}
+            drag
+            dragControls={dragControls}
+            dragListener={false}
+            dragMomentum={false}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onMouseDown={() => setZIndex((z) => z + 1)}
+            initial={{
+                opacity: 0,
+                scale: 0.9,
+                x: pos.x,
+                y: pos.y,
+            }}
+            animate={{
+                opacity: 1,
+                scale: 1,
+                x: pos.x,
+                y: pos.y,
+            }}
+            transition={{
+                type: "spring",
+                damping: 22,
+                stiffness: 240,
+                opacity: { duration: 0.2 },
+            }}
+            style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: PANEL_WIDTH,
+                zIndex,
+            }}
+            className="glass-panel rounded-xl overflow-hidden relative group pointer-events-auto shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
         >
-            {/* Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-primary/10">
-                <div className="flex items-center gap-2">
-                    <Eye size={12} className="text-primary" />
-                    <span className="text-[10px] font-mono text-primary/70 uppercase tracking-wider">
+            {/* Header — acts as drag handle */}
+            <div
+                onPointerDown={(e) => dragControls.start(e)}
+                className="flex items-center justify-between px-3 py-2 border-b border-primary/20 bg-background-dark/60 cursor-grab active:cursor-grabbing select-none"
+            >
+                <div className="flex items-center gap-2 min-w-0">
+                    <GripVertical
+                        size={12}
+                        className="text-primary/40 flex-shrink-0"
+                    />
+                    <Eye
+                        size={12}
+                        className="text-primary flex-shrink-0"
+                    />
+                    <span className="text-[10px] font-mono text-primary/70 uppercase tracking-wider truncate">
                         Vision Feed
                     </span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0">
                     {isCameraOn && isReady && (
                         <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                     )}

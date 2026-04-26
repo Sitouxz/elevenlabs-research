@@ -3,9 +3,12 @@ import { Visualizer } from "./components/Visualizer";
 import { Controls } from "./components/Controls";
 import { Transcript } from "./components/Transcript";
 import { CameraFeed } from "./components/CameraFeed";
+import { ImageStudio } from "./components/ImageStudio";
+import { ImageWindowManager } from "./components/ImageWindowManager";
 import { useElevenLabs } from "./hooks/useElevenLabs";
 import { useCamera } from "./hooks/useCamera";
 import { useVision } from "./hooks/useVision";
+import { useImageGeneration } from "./hooks/useImageGeneration";
 import { Activity, ShieldCheck, Eye } from "lucide-react";
 
 const AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "PASTE_YOUR_AGENT_ID_HERE";
@@ -29,7 +32,37 @@ function App() {
     toggleMute,
     interrupt,
     sendContextualUpdate,
+    registerClientTools,
   } = useElevenLabs(AGENT_ID);
+
+  const imageGen = useImageGeneration();
+
+  // Register the generate_image client tool ONCE at mount. The handler reads
+  // the latest imageGen.generate from a ref so we don't need to re-register
+  // (which would be a no-op anyway since startConversation snapshots tools).
+  const generateRef = useRef(imageGen.generate);
+  useEffect(() => {
+    generateRef.current = imageGen.generate;
+  }, [imageGen.generate]);
+
+  useEffect(() => {
+    registerClientTools({
+      generate_image: ({ prompt }) => {
+        console.log("[JARVIS tool] generate_image invoked with:", prompt);
+        const promptStr = typeof prompt === "string" ? prompt.trim() : "";
+        if (!promptStr) {
+          return "I need a description of the image you'd like me to create.";
+        }
+        generateRef.current(promptStr);
+        return `Generating an image of ${promptStr}. It will appear on screen in a moment.`;
+      },
+    });
+    console.log(
+      "[JARVIS] Client tools registered: generate_image. " +
+      "NOTE: For voice triggers to work, this tool must ALSO be declared " +
+      "on the agent dashboard. See README for instructions."
+    );
+  }, [registerClientTools]);
 
   // Keep isSpeakingRef in sync for use inside callbacks
   useEffect(() => {
@@ -164,26 +197,11 @@ function App() {
 
         {/* Center Stage: The AI Visualizer */}
         <main className="flex-grow flex flex-col items-center justify-center relative">
-          <div className="flex items-center gap-6">
-            <Visualizer
-              isSpeaking={isSpeaking}
-              isListening={isListening}
-              audioStream={stream}
-            />
-
-            {/* Camera Feed Panel */}
-            <div className="hidden md:block">
-              <CameraFeed
-                isCameraOn={camera.isCameraOn}
-                isAnalyzing={vision.isAnalyzing}
-                isReady={vision.isReady}
-                lastResult={vision.lastResult}
-                error={vision.error}
-                videoRef={camera.videoRef}
-                onToggleCamera={handleToggleCamera}
-              />
-            </div>
-          </div>
+          <Visualizer
+            isSpeaking={isSpeaking}
+            isListening={isListening}
+            audioStream={stream}
+          />
 
           {/* AI Status Text */}
           <div className="mt-8 text-center">
@@ -196,7 +214,17 @@ function App() {
 
         {/* Bottom Interface Layer */}
         <footer className="fixed bottom-0 left-0 w-full z-20 flex flex-col md:flex-row items-end justify-between p-4 md:p-10 pointer-events-none">
-          <div className="hidden md:block w-1/4"></div>
+          {/* Bottom-left: Image Studio dock (mirrors top-left System Monitor) */}
+          <div className="w-full md:w-auto flex justify-start mb-4 md:mb-0 pointer-events-auto">
+            <ImageStudio
+              history={imageGen.history}
+              activeCount={imageGen.windows.length}
+              model={imageGen.model}
+              onGenerate={imageGen.generate}
+              onReopen={imageGen.reopenFromHistory}
+              onClearHistory={imageGen.clearHistory}
+            />
+          </div>
           <div className="w-full md:w-auto flex justify-center mb-4 md:mb-0 pointer-events-auto">
             <Controls
               isConnected={isConnected}
@@ -213,6 +241,27 @@ function App() {
             <Transcript messages={messages} />
           </div>
         </footer>
+
+        {/* Floating draggable Vision Feed window (hidden on mobile) */}
+        <div className="hidden md:block">
+          <CameraFeed
+            isCameraOn={camera.isCameraOn}
+            isAnalyzing={vision.isAnalyzing}
+            isReady={vision.isReady}
+            lastResult={vision.lastResult}
+            error={vision.error}
+            videoRef={camera.videoRef}
+            onToggleCamera={handleToggleCamera}
+          />
+        </div>
+
+        {/* Floating image popup windows (Windows-style draggable) */}
+        <ImageWindowManager
+          windows={imageGen.windows}
+          onClose={imageGen.closeWindow}
+          onFocus={imageGen.focusWindow}
+          onPositionChange={imageGen.updateWindowPosition}
+        />
       </div>
     </div>
   );
