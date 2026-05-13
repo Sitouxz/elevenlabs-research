@@ -4,10 +4,11 @@ import { ChatLog } from "../components/ChatLog";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 
-const FIGMA_CITY_BG   = "/assets/end-city-bg.png";
-const FIGMA_LUMI      = "/assets/end-lumi.png";
+const BASE = import.meta.env.BASE_URL;
+const FIGMA_CITY_BG   = `${BASE}assets/end-city-bg.png`;
+const FIGMA_LUMI      = `${BASE}assets/end-lumi.png`;
 
-const FIGMA_VECTOR4   = "/assets/end-vector4.png";
+const FIGMA_VECTOR4   = `${BASE}assets/end-vector4.png`;
 
 interface EndScenarioScreenProps {
   avatar: UseAkoolAvatarReturn;

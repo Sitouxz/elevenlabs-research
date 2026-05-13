@@ -5,8 +5,9 @@ import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 import type { AppScreen } from "../types";
 
-const FIGMA_CITY_BG      = "/assets/menu-city-bg.png";
-const FIGMA_LUMI         = "/assets/menu-lumi.png";
+const BASE = import.meta.env.BASE_URL;
+const FIGMA_CITY_BG      = `${BASE}assets/menu-city-bg.png`;
+const FIGMA_LUMI         = `${BASE}assets/menu-lumi.png`;
 
 interface MainMenuScreenProps {
   avatar: UseAkoolAvatarReturn;

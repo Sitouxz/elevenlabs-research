@@ -3,9 +3,10 @@ import { LumiAvatar } from "../components/LumiAvatar";
 import { MicIndicator } from "../components/MicIndicator";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 
-const FIGMA_CITY_BG = "/assets/splash-city-bg.png";
-const FIGMA_LUMI_IMAGE = "/assets/splash-lumi.png";
-const FIGMA_LEAF_TL = "/assets/splash-leaf-tl.png";
+const BASE = import.meta.env.BASE_URL;
+const FIGMA_CITY_BG = `${BASE}assets/splash-city-bg.png`;
+const FIGMA_LUMI_IMAGE = `${BASE}assets/splash-lumi.png`;
+const FIGMA_LEAF_TL = `${BASE}assets/splash-leaf-tl.png`;
 
 interface SplashScreenProps {
   avatar: UseAkoolAvatarReturn;

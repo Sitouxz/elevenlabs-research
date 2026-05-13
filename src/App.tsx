@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAkoolAvatar } from "./hooks/useAkoolAvatar";
 import { useVoiceNav } from "./hooks/useVoiceNav";
@@ -15,12 +15,14 @@ import { NarationScreen } from "./screens/NarationScreen";
 import { SummaryScreen } from "./screens/SummaryScreen";
 import type { AppScreen, TopicId } from "./types";
 
+const BASE = import.meta.env.BASE_URL;
+
 const PRELOAD_IMAGES = [
-  "/assets/splash-city-bg.png", // Splash city bg
-  "/assets/splash-lumi.png",    // Splash Lumi
-  "/assets/menu-city-bg.png",   // Menu city bg
-  "/assets/menu-lumi.png",      // Menu Lumi
-  "/assets/splash-leaf-tl.png", // Leaf
+  `${BASE}assets/splash-city-bg.png`, // Splash city bg
+  `${BASE}assets/splash-lumi.png`,    // Splash Lumi
+  `${BASE}assets/menu-city-bg.png`,   // Menu city bg
+  `${BASE}assets/menu-lumi.png`,      // Menu Lumi
+  `${BASE}assets/splash-leaf-tl.png`, // Leaf
 ];
 
 
@@ -71,6 +73,21 @@ function App() {
     updateContextFromAvatar(last.text);
   }, [avatar.messages, updateContextFromAvatar]);
 
+  // Fallback splash exit: if the avatar starts speaking a second time while still on splash,
+  // the user must have said something (Akool STT heard it but didn't echo it back as a message).
+  const hasGreetedRef = useRef(false);
+  useEffect(() => {
+    if (!hasGreetedRef.current && avatar.messages.some(m => m.role === "ai")) {
+      hasGreetedRef.current = true;
+    }
+  }, [avatar.messages]);
+
+  useEffect(() => {
+    if (screen === "splash" && hasGreetedRef.current && avatar.isSpeaking) {
+      setScreen("main-menu");
+    }
+  }, [avatar.isSpeaking, screen]);
+
   // Parse user messages for voice-driven screen transitions
   useEffect(() => {
     if (avatar.messages.length === 0) return;
@@ -79,9 +96,10 @@ function App() {
     // Skip stale messages (>5s old) or overly long text (likely bot echo)
     if (Date.now() - (last.timestamp ?? 0) > 5000) return;
     if (last.text.length > 100) return;
-    // CRITICAL: Don't process navigation if avatar is speaking (prevents self-triggering)
-    if (avatar.isSpeaking) {
-      console.log("[App] Navigation blocked - avatar is speaking");
+
+    // Any speech on splash screen → go to main menu
+    if (screen === "splash") {
+      setScreen("main-menu");
       return;
     }
 
@@ -109,15 +127,15 @@ function App() {
 
     // topic-detail: navigate when on menu/select screens
     if (action.screen === "topic-detail" && action.topic) {
-      const canNavigateToTopic = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail" || screen === "splash";
+      const canNavigateToTopic = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail";
       if (canNavigateToTopic) {
         setActiveTopic(action.topic);
         setScreen("topic-detail");
       }
     }
-  }, [avatar.messages, avatar.isSpeaking, parseIntent, screen]);
+  }, [avatar.messages, parseIntent, screen]);
 
-  // No auto-transition - user must click on splash screen to proceed
+  // Splash exits on click or any voice input (handled above)
 
   const handleNavigate = (target: AppScreen) => {
     setActiveMenuBtn(target);
@@ -143,7 +161,7 @@ function App() {
   };
 
   const handleBack = () => {
-    if (screen === "topic-detail") setScreen("topic-select");
+    if (screen === "topic-detail") setScreen("main-menu");
     else if (screen === "topic-select") setScreen("main-menu");
     else if (screen === "ask-questions") setScreen("main-menu");
     else if (screen === "naration") setScreen("topic-detail");

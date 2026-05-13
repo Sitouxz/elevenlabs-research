@@ -3,6 +3,8 @@ import { LumiAvatar } from "../components/LumiAvatar";
 import { ChatLog } from "../components/ChatLog";
 import { TopicOrb } from "../components/TopicOrb";
 import { MicIndicator } from "../components/MicIndicator";
+
+const BASE = import.meta.env.BASE_URL;
 import { TOPICS } from "../types";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
@@ -20,7 +22,7 @@ export function TopicSelectScreen({ avatar, messages, isListening, onSelectTopic
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
-      <img src="/assets/menu-city-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
+      <img src={`${BASE}assets/menu-city-bg.png`} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
       {/* Glow ellipse behind Lumi — Figma Ellipse 1: x=423(11%), y=594(27.5%), w=872(22.7%), h=1466(67.9%) */}
