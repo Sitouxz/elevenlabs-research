@@ -237,10 +237,12 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             scene_mode: "fast_dialogue",
             ...(KNOWLEDGE_ID ? { knowledge_id: KNOWLEDGE_ID } : {}),
             ...(LLM_PROVIDER ? { llm_provider: LLM_PROVIDER } : {}),
+            ...(!ELEVENLABS_API_KEY && VOICE_ID ? { voice_id: VOICE_ID } : {}),
             stream_type: "agora",
             voice_params: {
               stt_language: LANGUAGE,
               stt_type: "openai_realtime",
+              voice: "shimmer",
               turn_detection: {
                 type: "server_vad",
                 threshold: 0.85,
@@ -258,17 +260,12 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                   style: 0,
                   use_speaker_boost: true,
                 },
-              } : {
-                // Fallback: use Akool voice_id if no ElevenLabs key
-                ...(VOICE_ID ? { voice_id: VOICE_ID } : {}),
-              }),
+              } : {}),
             },
           }),
         });
         if (!res.ok) throw new Error(`Session create failed: ${res.status}`);
         data = await res.json();
-        console.log("[Akool] Session create response:", JSON.stringify(data));
-        console.log("[Akool] ElevenLabs key present:", !!ELEVENLABS_API_KEY, "| Voice ID:", ELEVENLABS_VOICE_ID);
         if (data?.code === 1000) break;
         const isBusy = typeof data?.msg === "string" && data.msg.toLowerCase().includes("busy");
         if (isBusy && attempt < MAX_RETRIES) {
@@ -731,8 +728,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
         }
       }, 12000);
 
-      // Browser STT shadow — captures user transcripts for chat log & navigation
-      // Akool handles all actual LLM+TTS; this only populates messages[]
+      // Browser STT — populates messages[] for chat log & voice navigation
       const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognitionCtor) {
         const rec = new SpeechRecognitionCtor();
@@ -740,33 +736,20 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
         rec.interimResults = false;
         rec.continuous = true;
         rec.onresult = (event: any) => {
-          // Only read the NEW result at resultIndex — not the full history
           const result = event.results[event.resultIndex];
           if (!result?.isFinal) return;
-          // Hard block: drop everything while avatar is speaking
           if (isSpeakingRef.current) return;
-          // Hard block: drop results within 1.5s of TTS end — browser STT buffers audio
           if (Date.now() - lastTtsEndRef.current < 1500) return;
           const confidence = result[0].confidence ?? 1;
-          // Ignore low-confidence results (background noise, echo artifacts) - lowered from 0.7
           if (confidence < 0.6) return;
           const transcript = result[0].transcript.trim();
-          // Ignore very short transcripts likely caused by noise
           if (transcript.length < 2) return;
-          // Echo suppression is handled by two hard blocks above:
-          //   1. isSpeakingRef.current → drops everything while avatar is speaking
-          //   2. 1.5s lastTtsEndRef cooldown → drops results immediately after TTS ends
-          // Word-overlap was removed because short navigation phrases ("start discovery",
-          // "solar") legitimately appear in bot messages and get wrongly suppressed.
-          if (transcript) {
-            if (import.meta.env.DEV) console.log("[Akool] Browser STT accepted:", transcript);
-            setMessages((prev) => {
-              // Deduplicate: skip if last user message is the same text
-              const last = prev[prev.length - 1];
-              if (last?.role === "user" && last.text === transcript) return prev;
-              return [...prev, { role: "user", text: transcript, timestamp: Date.now() }];
-            });
-          }
+          if (import.meta.env.DEV) console.log("[Akool] Browser STT accepted:", transcript);
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "user" && last.text === transcript) return prev;
+            return [...prev, { role: "user", text: transcript, timestamp: Date.now() }];
+          });
         };
         rec.onerror = (e: any) => {
           if (e.error !== "no-speech" && e.error !== "aborted") {
@@ -775,16 +758,14 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
         };
         rec.onend = () => {
           if (!speechRecRef.current) return;
-          // Always restart — if it ended while avatar was speaking the !isSpeakingRef guard
-          // would leave STT permanently dead. Echo suppression handles false positives.
           setTimeout(() => {
             if (!speechRecRef.current) return;
-            try { rec.start(); } catch { /* already started or destroyed */ }
+            try { rec.start(); } catch { /* already started */ }
           }, 200);
         };
         speechRecRef.current = rec;
         rec.start();
-        console.log("[Akool] Browser STT shadow started for chat log/navigation");
+        console.log("[Akool] Browser STT started");
       }
 
       _initInProgress = false;

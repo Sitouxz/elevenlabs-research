@@ -93,15 +93,27 @@ function App() {
     if (avatar.messages.length === 0) return;
     const last = avatar.messages[avatar.messages.length - 1];
     if (last.role !== "user") return;
-    // Skip stale messages (>5s old) or overly long text (likely bot echo)
+    // Skip stale messages (>5s old)
     if (Date.now() - (last.timestamp ?? 0) > 5000) return;
-    if (last.text.length > 100) return;
 
     // Any speech on splash screen → go to main menu
     if (screen === "splash") {
       setScreen("main-menu");
       return;
     }
+
+    // On ask-questions: scan full message for topic keywords regardless of length
+    if (screen === "ask-questions") {
+      const lower = last.text.toLowerCase();
+      if (lower.includes("solar")) {
+        setActiveTopic("solar");
+        setScreen("topic-detail");
+        return;
+      }
+    }
+
+    // Skip overly long text (likely bot echo) for remaining intent matching
+    if (last.text.length > 100) return;
 
     const action = parseIntent(last.text);
 
@@ -125,9 +137,9 @@ function App() {
       return;
     }
 
-    // topic-detail: navigate when on menu/select screens
+    // topic-detail: navigate when on menu/select/ask-questions screens
     if (action.screen === "topic-detail" && action.topic) {
-      const canNavigateToTopic = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail";
+      const canNavigateToTopic = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail" || screen === "ask-questions";
       if (canNavigateToTopic) {
         setActiveTopic(action.topic);
         setScreen("topic-detail");
