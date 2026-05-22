@@ -76,6 +76,18 @@ const BYTES_PER_SECOND = 6000;
 const FX_LLM_ENABLED = isFxConfigured();
 const AKOOL_MODE_TYPE = FX_LLM_ENABLED ? 1 : 2;
 const FX_HISTORY_MAX_TURNS = 12;
+// Primed opening greeting spoken on avatar init, then seeded into FX history as a
+// completed exchange so FX never re-greets. FX treats any message with no prior
+// USER turn as "first contact" and always greets — the fake user ack breaks that.
+const FX_OPENING_GREETING = "Hello and welcome to the interactive smart energy education experience in Singapore! Would you like to Start Discovery and explore one of our energy topics, or Ask a General Question about smart energy?";
+// Full fake exchange added to fxHistoryRef on init: ai greeting + user ack + ai ready.
+// This tells FX the intro is done so it responds to content directly.
+const FX_PRIMED_HISTORY = [
+  { ai: FX_OPENING_GREETING },
+  { user: "let's start" },
+  { ai: "Great! Ask me anything about Solar Energy, EV Charging, Battery Storage, or AI in Energy Management — or say 'Start Discovery' to explore a topic." },
+];
+
 
 // Module-level singleton — survives React StrictMode double-invoke
 let _activeSessionId: string | null = null;
@@ -173,6 +185,8 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   // Guard against double-dispatching FX for the same transcript (browser STT + Akool ASR can both fire)
   const fxInFlightRef = useRef<boolean>(false);
   const fxLastPromptRef = useRef<string>("");
+  // Queue: if a dispatch arrives while one is in flight, store the latest prompt here
+  const fxQueuedPromptRef = useRef<string | null>(null);
   // Forward-reference to speak() so the FX dispatcher (created inside initStreamingSession) can call it.
   const speakRef = useRef<(text: string) => Promise<void>>(async () => { /* set after speak is defined */ });
   const lastTtsEndRef = useRef<number>(0);
@@ -245,32 +259,33 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
     });
     return appended;
   }, [normalizeTranscript]);
+  const dispatchFxRef = useRef<(userText: string) => Promise<void>>(async () => {});
   const dispatchFx = useCallback(async (userText: string) => {
     if (!FX_LLM_ENABLED) return;
     const trimmed = userText.trim();
     if (!trimmed) return;
-    // Normalize: lowercase, collapse whitespace, strip terminal punctuation.
     const norm = trimmed.toLowerCase().replace(/\s+/g, " ").replace(/[.!?,;:]+$/g, "");
     const now = Date.now();
-    // Drop if an FX call is in flight with the same normalized prompt.
-    if (fxInFlightRef.current && fxLastPromptRef.current === norm) return;
-    // Drop if we just dispatched the same normalized prompt within 5s (multi-source duplicate).
+    // Drop exact duplicate within 5s (multi-source dedup: browser STT + Akool ASR).
     if (fxLastPromptRef.current === norm && now - fxLastDispatchAtRef.current < 5000) return;
+    // Serialize: if one is in flight, queue this prompt (replacing any previous queued).
+    // This prevents concurrent speak() calls which cause Akool to drop one response.
+    if (fxInFlightRef.current) {
+      fxQueuedPromptRef.current = trimmed;
+      return;
+    }
     fxLastPromptRef.current = norm;
     fxLastDispatchAtRef.current = now;
     fxInFlightRef.current = true;
     try {
       const history = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS);
       const res = await chatWithFx(trimmed, history);
-      // Append turn to history (user + ai) and trim
       fxHistoryRef.current.push({ user: trimmed });
       fxHistoryRef.current.push({ ai: res.text });
       if (fxHistoryRef.current.length > FX_HISTORY_MAX_TURNS * 2) {
         fxHistoryRef.current = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS * 2);
       }
-      // Add to chat log and speak via Akool (retelling mode)
       setMessages((prev) => [...prev, { role: "ai", text: res.text, timestamp: Date.now() }]);
-      // Track for echo suppression
       recentBotTextsRef.current.push(res.text.toLowerCase());
       if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
       await speakRef.current(res.text);
@@ -278,6 +293,12 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       console.error("[FX] dispatch failed:", e);
     } finally {
       fxInFlightRef.current = false;
+      // Drain queue: replay the latest buffered prompt (if any) after current finishes.
+      const queued = fxQueuedPromptRef.current;
+      if (queued) {
+        fxQueuedPromptRef.current = null;
+        dispatchFxRef.current(queued);
+      }
     }
   }, []);
 
@@ -822,11 +843,24 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           console.warn("[Akool] Failed to send system prompt:", e);
         }
       } else {
-        // FX mode: no first-response suppression needed; publish mic immediately.
+        // FX mode: prime history with opening greeting so FX never re-greets on
+        // the first real user message. The FX backend treats empty history as
+        // "first interaction" and always responds with a welcome, regardless of
+        // what the user says. Seeding one AI turn breaks that pattern.
+        fxHistoryRef.current = [...FX_PRIMED_HISTORY];
+        setMessages([{ role: "ai", text: FX_OPENING_GREETING, timestamp: Date.now() }]);
         suppressFirstResponseRef.current = false;
         speakingMuteRef.current = false;
-        unmuteMic(agoraClientRef.current, micTrackRef.current);
-        setIsListening(true);
+        setIsListening(false);
+        // Seed echo suppression with the opening greeting text.
+        recentBotTextsRef.current.push(FX_OPENING_GREETING.toLowerCase());
+        // Speak the primed greeting so the user hears a welcome on load.
+        // Use a timeout to let Agora audio track stabilize first.
+        setTimeout(() => {
+          speakRef.current(FX_OPENING_GREETING).then(() => {
+            setIsListening(true);
+          });
+        }, 1500);
         console.log("[Akool] Retelling mode active — FX LLM will drive avatar speech");
       }
       // Safety: if system prompt chat fin never arrives, publish mic after 12s
@@ -875,11 +909,8 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           const transcript = result[0].transcript.trim();
           if (transcript.length < 2) return;
           if (import.meta.env.DEV) console.log("[Akool] Browser STT accepted:", transcript);
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role === "user" && last.text === transcript) return prev;
-            return [...prev, { role: "user", text: transcript, timestamp: Date.now() }];
-          });
+          const sttAdded = appendUserMessage(transcript);
+          if (sttAdded && FX_LLM_ENABLED) dispatchFx(transcript);
         };
         rec.onerror = (e: any) => {
           if (e.error !== "no-speech" && e.error !== "aborted") {
@@ -1051,6 +1082,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
 
   // Keep speakRef in sync so the FX dispatcher can invoke the latest speak() closure.
   useEffect(() => { speakRef.current = speak; }, [speak]);
+  useEffect(() => { dispatchFxRef.current = dispatchFx; }, [dispatchFx]);
 
   // startListening: republish mic so Akool STT picks up the user, resume browser STT shadow
   const startListening = useCallback(async () => {
