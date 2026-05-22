@@ -5,6 +5,7 @@ import AgoraRTC, {
   type IRemoteAudioTrack,
   type IRemoteVideoTrack,
 } from "agora-rtc-sdk-ng";
+import { chatWithFx, isFxConfigured, type FxChatTurn } from "../lib/fxChat";
 
 interface RTCClient extends IAgoraRTCClient {
   sendStreamMessage(msg: Uint8Array | string, flag: boolean): Promise<void>;
@@ -66,6 +67,13 @@ IMPORTANT RULES:
 
 const MAX_ENCODED_SIZE = 950;
 const BYTES_PER_SECOND = 6000;
+
+// When FX LLM is configured we run Akool in retelling mode (mode_type:1) and
+// drive the avatar's speech from FX. Otherwise we use Akool's built-in LLM
+// (mode_type:2 / fast_dialogue) as before.
+const FX_LLM_ENABLED = isFxConfigured();
+const AKOOL_MODE_TYPE = FX_LLM_ENABLED ? 1 : 2;
+const FX_HISTORY_MAX_TURNS = 12;
 
 // Module-level singleton — survives React StrictMode double-invoke
 let _activeSessionId: string | null = null;
@@ -146,6 +154,10 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const agoraClientRef = useRef<RTCClient | null>(null);
   const videoTrackRef = useRef<IRemoteVideoTrack | null>(null);
   const remoteAudioRef = useRef<IRemoteAudioTrack | null>(null);
+  // In FX mode, gate the remote audio at volume 0 until our first FX-driven speak()
+  // so Akool's hardcoded avatar greeting ("Hello") plays silently and only the
+  // FX reply is heard. Cleared on the first speak().
+  const audioGatedRef = useRef<boolean>(FX_LLM_ENABLED);
   const micTrackRef = useRef<ILocalAudioTrack | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const isSpeakingRef = useRef(false);
@@ -154,6 +166,13 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const speakingGenerationRef = useRef(0); // Incremented each time TTS starts, prevents stale timeouts from unmuting
   const partialBotRef = useRef<string>("");
   const speechRecRef = useRef<any>(null);
+  // FX LLM chat history (alternating user/ai turns, oldest first)
+  const fxHistoryRef = useRef<FxChatTurn[]>([]);
+  // Guard against double-dispatching FX for the same transcript (browser STT + Akool ASR can both fire)
+  const fxInFlightRef = useRef<boolean>(false);
+  const fxLastPromptRef = useRef<string>("");
+  // Forward-reference to speak() so the FX dispatcher (created inside initStreamingSession) can call it.
+  const speakRef = useRef<(text: string) => Promise<void>>(async () => { /* set after speak is defined */ });
   const lastTtsEndRef = useRef<number>(0);
   const recentBotTextsRef = useRef<string[]>([]);
   const suppressFirstResponseRef = useRef<boolean>(false);
@@ -189,6 +208,74 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       console.log("[Akool] Session closed:", sessionId);
     } catch (e) {
       console.warn("[Akool] Session close failed:", e);
+    }
+  }, []);
+
+  // Dispatch a user transcript to FX LLM, then have the avatar speak the reply.
+  // Idempotent for duplicate transcripts — browser STT, Akool ASR, and Akool's
+  // chat-from-user event can all fire for the same utterance with different
+  // casing / punctuation, so we normalize before comparing.
+  const fxLastDispatchAtRef = useRef<number>(0);
+
+  // Normalize a transcript for dedupe (lowercase, collapse ws, strip terminal punctuation).
+  const normalizeTranscript = useCallback((s: string) =>
+    s.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.!?,;:]+$/g, ""), []);
+
+  // Append a user transcript to the chat log, deduping against the last few user
+  // messages (handles the case where browser STT, Akool ASR, and Akool's
+  // chat-from-user event all surface the same utterance with different casing).
+  const appendUserMessage = useCallback((text: string): boolean => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    const norm = normalizeTranscript(trimmed);
+    let appended = false;
+    setMessages((prev) => {
+      // Check the last 3 messages for a normalized match within 8 seconds
+      const cutoff = Date.now() - 8000;
+      for (let i = prev.length - 1, checked = 0; i >= 0 && checked < 3; i--, checked++) {
+        const m = prev[i];
+        if (m.role !== "user") continue;
+        if (m.timestamp < cutoff) break;
+        if (normalizeTranscript(m.text) === norm) return prev;
+      }
+      appended = true;
+      return [...prev, { role: "user", text: trimmed, timestamp: Date.now() }];
+    });
+    return appended;
+  }, [normalizeTranscript]);
+  const dispatchFx = useCallback(async (userText: string) => {
+    if (!FX_LLM_ENABLED) return;
+    const trimmed = userText.trim();
+    if (!trimmed) return;
+    // Normalize: lowercase, collapse whitespace, strip terminal punctuation.
+    const norm = trimmed.toLowerCase().replace(/\s+/g, " ").replace(/[.!?,;:]+$/g, "");
+    const now = Date.now();
+    // Drop if an FX call is in flight with the same normalized prompt.
+    if (fxInFlightRef.current && fxLastPromptRef.current === norm) return;
+    // Drop if we just dispatched the same normalized prompt within 5s (multi-source duplicate).
+    if (fxLastPromptRef.current === norm && now - fxLastDispatchAtRef.current < 5000) return;
+    fxLastPromptRef.current = norm;
+    fxLastDispatchAtRef.current = now;
+    fxInFlightRef.current = true;
+    try {
+      const history = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS);
+      const res = await chatWithFx(trimmed, history);
+      // Append turn to history (user + ai) and trim
+      fxHistoryRef.current.push({ user: trimmed });
+      fxHistoryRef.current.push({ ai: res.text });
+      if (fxHistoryRef.current.length > FX_HISTORY_MAX_TURNS * 2) {
+        fxHistoryRef.current = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS * 2);
+      }
+      // Add to chat log and speak via Akool (retelling mode)
+      setMessages((prev) => [...prev, { role: "ai", text: res.text, timestamp: Date.now() }]);
+      // Track for echo suppression
+      recentBotTextsRef.current.push(res.text.toLowerCase());
+      if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
+      await speakRef.current(res.text);
+    } catch (e) {
+      console.error("[FX] dispatch failed:", e);
+    } finally {
+      fxInFlightRef.current = false;
     }
   }, []);
 
@@ -230,11 +317,15 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           body: JSON.stringify({
             avatar_id: AVATAR_ID,
             duration: 600,
-            mode_type: 2,
+            mode_type: AKOOL_MODE_TYPE,
             language: LANGUAGE,
-            scene_mode: "fast_dialogue",
-            ...(KNOWLEDGE_ID ? { knowledge_id: KNOWLEDGE_ID } : {}),
-            ...(LLM_PROVIDER ? { llm_provider: LLM_PROVIDER } : {}),
+            // scene_mode is only meaningful in dialogue mode (mode_type:2)
+            ...(AKOOL_MODE_TYPE === 2 ? { scene_mode: "fast_dialogue" } : {}),
+            // In retelling mode (FX owns the LLM) we MUST NOT forward knowledge_id /
+            // llm_provider — otherwise Akool runs its own brain alongside ours and
+            // the avatar double-speaks (one reply from Akool, one from FX).
+            ...(!FX_LLM_ENABLED && KNOWLEDGE_ID ? { knowledge_id: KNOWLEDGE_ID } : {}),
+            ...(!FX_LLM_ENABLED && LLM_PROVIDER ? { llm_provider: LLM_PROVIDER } : {}),
             stream_type: "agora",
             voice_params: {
               stt_language: LANGUAGE,
@@ -333,6 +424,12 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           remoteAudioRef.current = track as IRemoteAudioTrack;
           try {
             (track as IRemoteAudioTrack).play();
+            // Mute Akool's hardcoded avatar greeting in FX mode — only un-gate
+            // when our first FX-driven speak() runs.
+            if (audioGatedRef.current) {
+              try { (track as IRemoteAudioTrack).setVolume(0); } catch { /* setVolume not supported */ }
+              console.log("[Akool] Remote audio gated (volume=0) until first FX reply");
+            }
             console.log("[Akool] Remote audio playing");
           } catch (e) {
             console.warn("[Akool] Audio autoplay blocked:", e);
@@ -525,13 +622,25 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             }
 
             if (import.meta.env.DEV) console.log("[Akool] ASR accepted:", trimmed);
-            setMessages((prev) => [...prev, { role: "user", text: trimmed, timestamp: Date.now() }]);
+            const asrAdded = appendUserMessage(trimmed);
+            // In retelling mode, forward the transcript to FX LLM and have the avatar speak its reply.
+            // Only dispatch if this transcript wasn't already handled (dedupe across intake paths).
+            if (asrAdded && FX_LLM_ENABLED) dispatchFx(trimmed);
           }
 
           // Chat events — bot response text and user transcript for chat log
           if (msg?.type === "chat") {
             const pld = msg.pld;
             if (pld?.from === "bot") {
+              // In FX mode, Akool's brain is NOT the source of truth. Some avatar
+              // profiles emit spontaneous greetings ("Hello") with TTS audio even in
+              // retelling mode — we must NOT add those to the chat log or the echo
+              // filter, otherwise the user's next utterance gets falsely suppressed.
+              // FX-generated replies are tracked separately inside dispatchFx().
+              if (FX_LLM_ENABLED) {
+                if (import.meta.env.DEV) console.log("[Akool] Ignoring spontaneous bot chat (FX mode):", (pld.text ?? "").slice(0, 60));
+                return;
+              }
               // Suppress first bot response after system prompt (prevents double-speaking on init)
               if (suppressFirstResponseRef.current) {
                 if (msg.fin) {
@@ -657,7 +766,8 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               }
 
               if (import.meta.env.DEV) console.log("[Akool] Chat user msg accepted:", trimmed);
-              setMessages((prev) => [...prev, { role: "user", text: trimmed, timestamp: Date.now() }]);
+              const chatAdded = appendUserMessage(trimmed);
+              if (chatAdded && FX_LLM_ENABLED) dispatchFx(trimmed);
             }
           }
         } catch {
@@ -667,30 +777,50 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
 
       await client.join(creds.agora_app_id, creds.agora_channel, creds.agora_token, creds.agora_uid);
 
-      // Create mic track but do NOT publish yet — publish only after system prompt response finishes
-      try {
-        const mic = await AgoraRTC.createMicrophoneAudioTrack({
-          encoderConfig: { sampleRate: 16000, bitrate: 24, stereo: false },
-          AEC: true,
-          ANS: true,
-          AGC: true,
-        });
-        micTrackRef.current = mic;
-        speakingMuteRef.current = true;
-        setIsListening(false);
-        console.log("[Akool] Mic created (unpublished) — will publish after system prompt response");
-      } catch (micErr) {
-        console.warn("[Akool] Mic create failed (no mic or permission denied):", micErr);
+      // Create mic track unless we're in FX mode. In FX mode the user's voice is
+      // captured by the browser's Web Speech API for STT only — we MUST NOT publish
+      // mic audio to Akool's Agora channel, otherwise Akool's retelling mode (mode_type:1)
+      // makes the avatar parrot every utterance back through the avatar's mouth.
+      if (!FX_LLM_ENABLED) {
+        try {
+          const mic = await AgoraRTC.createMicrophoneAudioTrack({
+            encoderConfig: { sampleRate: 16000, bitrate: 24, stereo: false },
+            AEC: true,
+            ANS: true,
+            AGC: true,
+          });
+          micTrackRef.current = mic;
+          speakingMuteRef.current = true;
+          setIsListening(false);
+          console.log("[Akool] Mic created (unpublished) — will publish after system prompt response");
+        } catch (micErr) {
+          console.warn("[Akool] Mic create failed (no mic or permission denied):", micErr);
+        }
+      } else {
+        // FX mode: no Akool mic publication. Browser STT will use the system mic directly.
+        speakingMuteRef.current = false;
+        setIsListening(true);
+        console.log("[Akool] FX mode — Akool mic NOT created (browser STT only)");
       }
 
-      // Send system prompt as first chat message so LLM knows its role
-      // Suppress the bot's response to the system prompt (LLM often hallucinates a topic selection)
-      suppressFirstResponseRef.current = true;
-      try {
-        await sendChunked(client, SYSTEM_PROMPT, "chat");
-        console.log("[Akool] System prompt sent via chat message");
-      } catch (e) {
-        console.warn("[Akool] Failed to send system prompt:", e);
+      // Send system prompt only when using Akool's built-in LLM. In retelling mode
+      // (FX backend), the FX config already owns the persona/system prompt, so skip.
+      if (!FX_LLM_ENABLED) {
+        // Suppress the bot's response to the system prompt (LLM often hallucinates a topic selection)
+        suppressFirstResponseRef.current = true;
+        try {
+          await sendChunked(client, SYSTEM_PROMPT, "chat");
+          console.log("[Akool] System prompt sent via chat message");
+        } catch (e) {
+          console.warn("[Akool] Failed to send system prompt:", e);
+        }
+      } else {
+        // FX mode: no first-response suppression needed; publish mic immediately.
+        suppressFirstResponseRef.current = false;
+        speakingMuteRef.current = false;
+        unmuteMic(agoraClientRef.current, micTrackRef.current);
+        setIsListening(true);
+        console.log("[Akool] Retelling mode active — FX LLM will drive avatar speech");
       }
       // Safety: if system prompt chat fin never arrives, publish mic after 12s
       const generationAtInit = speakingGenerationRef.current;
@@ -763,12 +893,9 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           }
           if (transcript) {
             if (import.meta.env.DEV) console.log("[Akool] Browser STT accepted:", transcript);
-            setMessages((prev) => {
-              // Deduplicate: skip if last user message is the same text
-              const last = prev[prev.length - 1];
-              if (last?.role === "user" && last.text === transcript) return prev;
-              return [...prev, { role: "user", text: transcript, timestamp: Date.now() }];
-            });
+            const sttAdded = appendUserMessage(transcript);
+            // Only dispatch to FX if this transcript wasn't already handled by another intake path
+            if (sttAdded && FX_LLM_ENABLED) dispatchFx(transcript);
           }
         };
         rec.onerror = (e: any) => {
@@ -857,6 +984,13 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       unmutePendingRef.current = null;
     }
     console.log(`[Akool] speak() started - generation ${speakGeneration}`);
+    // First FX-driven speak: lift the audio gate so the avatar is actually audible.
+    // (Akool's hardcoded greeting played silently before this point in FX mode.)
+    if (audioGatedRef.current) {
+      audioGatedRef.current = false;
+      try { remoteAudioRef.current?.setVolume(100); } catch { /* setVolume not supported */ }
+      console.log("[Akool] Remote audio un-gated (volume=100)");
+    }
     // Unpublish mic immediately — republish happens when TTS end event arrives
     speakingMuteRef.current = true;
     setIsListening(false);
@@ -870,7 +1004,10 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       try { speechRecRef.current.stop(); } catch { /* already stopped */ }
     }
     try {
-      await sendChunked(client, text, "tts");
+      // In retelling mode (mode_type:1) Akool expects type:"chat" for the text the
+      // avatar should speak. Using type:"tts" works in dialogue mode but only
+      // synthesizes the first segment in retelling mode (cut-off behaviour).
+      await sendChunked(client, text, FX_LLM_ENABLED ? "chat" : "tts");
       // Safety reset if server never sends a done event within 30s
       setTimeout(() => {
         if (isSpeakingRef.current) {
@@ -922,6 +1059,9 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       }
     }
   }, [mode]);
+
+  // Keep speakRef in sync so the FX dispatcher can invoke the latest speak() closure.
+  useEffect(() => { speakRef.current = speak; }, [speak]);
 
   // startListening: republish mic so Akool STT picks up the user, resume browser STT shadow
   const startListening = useCallback(async () => {
