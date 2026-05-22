@@ -14,12 +14,14 @@ interface ConversationContext {
   expiresAt: number;
 }
 
-// Topic selection requires explicit phrasing — avoids false positives from casual mentions
+// Topic selection — single-word names allowed since this is a kiosk with known domain.
+// ORDER MATTERS: battery is checked before solar so "energy storage" routes to battery
+// before solar's "energy" alias can accidentally match it via startsWith.
 const TOPIC_EXPLICIT_PHRASES: { topic: TopicId; phrases: string[] }[] = [
-  { topic: "solar", phrases: ["solar energy", "choose solar", "select solar", "pick solar", "go to solar", "let's do solar", "explore solar", "i want solar"] },
-  { topic: "ev", phrases: ["ev charging", "electric vehicle", "electric car", "choose ev", "select ev", "pick ev", "go to ev", "let's do ev", "explore ev", "i want ev"] },
-  { topic: "battery", phrases: ["battery storage", "energy storage", "choose battery", "select battery", "pick battery", "go to battery", "let's do battery", "explore battery", "i want battery"] },
-  { topic: "ai", phrases: ["ai in energy", "artificial intelligence energy", "choose ai", "select ai", "pick ai", "go to ai", "let's do ai", "explore ai energy", "i want ai"] },
+  { topic: "battery", phrases: ["battery storage", "battery", "energy storage", "choose battery", "select battery", "pick battery", "go to battery", "let's do battery", "explore battery", "i want battery", "the battery"] },
+  { topic: "solar", phrases: ["solar energy", "solar", "energy", "choose solar", "select solar", "pick solar", "go to solar", "let's do solar", "explore solar", "i want solar", "the solar"] },
+  { topic: "ev", phrases: ["ev charging", "ev", "electric vehicle", "electric car", "choose ev", "select ev", "pick ev", "go to ev", "let's do ev", "explore ev", "i want ev", "the ev"] },
+  { topic: "ai", phrases: ["ai in energy", "ai", "artificial intelligence energy", "artificial intelligence", "choose ai", "select ai", "pick ai", "go to ai", "let's do ai", "explore ai", "i want ai", "the ai"] },
 ];
 
 // Require explicit action phrases - must be at start of utterance for high confidence
@@ -42,6 +44,11 @@ const EXPLICIT_ACTION_PHRASES = {
     "go to home",
     "back to main",
     "return to menu",
+    "go to menu",
+    "go to main menu",
+    "take me to menu",
+    "home",
+    "menu",
   ],
   startDiscovery: [
     "start discovery",
@@ -52,6 +59,14 @@ const EXPLICIT_ACTION_PHRASES = {
     "explore topics",
     "show me the topics",
     "show topics",
+    "discovery",
+    "discover",
+    "i want to discover",
+    "let's discover",
+    "let me discover",
+    "i want to explore",
+    "let me explore",
+    "let's explore",
   ],
 };
 
@@ -93,6 +108,7 @@ const NAVIGATION_SUGGESTIONS = [
   { pattern: /begin (?:the )?(\w+(?:\s+\w+)?)/i, screen: "topic-detail", extractTopic: true },
   { pattern: /shall we (?:start|begin|go|explore)/i, screen: "topic-select" },
   { pattern: /want to (?:ask|learn|explore)/i, screen: "ask-questions" },
+  { pattern: /dive into|which (?:topic|one)|pick (?:a )?topic|choose (?:a )?topic/i, screen: "topic-select" },
 ];
 
 // Affirmative responses that accept a navigation suggestion
@@ -187,10 +203,45 @@ export function useVoiceNav() {
       contextRef.current = null;
     }
 
-    // 3. Original logic: Ignore very short queries for keyword matching
+    // 3. TOPIC SELECTION — checked before the length gate so short names like "ev" work
+    for (const { topic, phrases } of TOPIC_EXPLICIT_PHRASES) {
+      for (const phrase of phrases) {
+        if (lower === phrase || lower.startsWith(phrase + " ") || lower.startsWith(phrase + ",") || lower.startsWith(phrase + ".")) {
+          return { screen: "topic-detail", topic };
+        }
+        const intentPrefixes = [
+          "tell me about ",
+          "explain ",
+          "what is ",
+          "how does ",
+          "i want to learn about ",
+          "let's learn about ",
+          "what about ",
+          "how about ",
+          "i want to know about ",
+          "i want to know more about ",
+          "i'd like to know about ",
+          "i'd like to learn about ",
+          "can you tell me about ",
+          "show me ",
+          "switch to ",
+          "let's go to ",
+          "can we go to ",
+          "more about ",
+          "about ",
+        ];
+        for (const prefix of intentPrefixes) {
+          if (lower.startsWith(prefix + phrase)) {
+            return { screen: "topic-detail", topic };
+          }
+        }
+      }
+    }
+
+    // 4. Ignore very short queries for remaining keyword matching
     if (lower.length < 4) return {};
 
-    // 4. ACTION INTENTS checked with EXPLICIT matching
+    // 5. ACTION INTENTS checked with EXPLICIT matching
     if (hasExplicitPhrase(lower, EXPLICIT_ACTION_PHRASES.askQuestion)) {
       return { screen: "ask-questions" };
     }
@@ -201,28 +252,6 @@ export function useVoiceNav() {
 
     if (hasExplicitPhrase(lower, EXPLICIT_ACTION_PHRASES.startDiscovery)) {
       return { screen: "topic-select" };
-    }
-
-    // 5. TOPIC SELECTION
-    for (const { topic, phrases } of TOPIC_EXPLICIT_PHRASES) {
-      for (const phrase of phrases) {
-        if (lower.startsWith(phrase)) {
-          return { screen: "topic-detail", topic };
-        }
-        const intentPrefixes = [
-          "tell me about ",
-          "explain ",
-          "what is ",
-          "how does ",
-          "i want to learn about ",
-          "let's learn about ",
-        ];
-        for (const prefix of intentPrefixes) {
-          if (lower.startsWith(prefix + phrase)) {
-            return { screen: "topic-detail", topic };
-          }
-        }
-      }
     }
 
     return {};

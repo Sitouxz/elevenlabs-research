@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import type { AvatarMode } from "../hooks/useAkoolAvatar";
 
-const DEFAULT_LUMI_STATIC = "/assets/menu-lumi.png";
+const DEFAULT_LUMI_STATIC = `${import.meta.env.BASE_URL}assets/menu-lumi.png`;
 
 // Pixels where R,G,B all above this AND saturation is low are keyed out
 const WHITE_THRESHOLD = 225;
@@ -180,7 +180,7 @@ export function LumiAvatar({ mode, isReady, isSpeaking, videoTrackReady, videoRe
           animate={isSpeaking ? { scale: [1, 1.01, 1] } : { scale: 1 }}
           transition={{ duration: 0.6, repeat: isSpeaking ? Infinity : 0, ease: "easeInOut" }}
           onError={(e) => {
-            (e.target as HTMLImageElement).src = "/lumi-static.svg";
+            (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}lumi-static.svg`;
           }}
         />
       )}

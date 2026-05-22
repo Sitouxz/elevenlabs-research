@@ -3,6 +3,8 @@ import { LumiAvatar } from "../components/LumiAvatar";
 import { MicIndicator } from "../components/MicIndicator";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 
+const BASE = import.meta.env.BASE_URL;
+
 interface ScoreScreenProps {
   avatar: UseAkoolAvatarReturn;
   score: number;
@@ -27,7 +29,7 @@ export function ScoreScreen({
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
-      <img src="/assets/menu-city-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
+      <img src={`${BASE}assets/menu-city-bg.png`} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
       {/* Glow ellipse behind Lumi — Figma Ellipse 1: x=627(16.3%), y=553(25.6%), w=778(20.3%), h=1307(60.5%) */}

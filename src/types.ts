@@ -23,13 +23,15 @@ export interface Topic {
   titleMain: string;
 }
 
+const BASE = import.meta.env.BASE_URL;
+
 export const TOPICS: Topic[] = [
   {
     id: "solar",
     label: "SOLAR",
     sublabel: "ENERGY",
-    icon: "/icons/solar.svg",
-    bgImage: "/backgrounds/solar-bg.svg",
+    icon: `${BASE}icons/solar.svg`,
+    bgImage: `${BASE}backgrounds/solar-bg.svg`,
     titlePrefix: "UNDERSTANDING",
     titleMain: "SOLAR ENERGY",
   },
@@ -37,8 +39,8 @@ export const TOPICS: Topic[] = [
     id: "ev",
     label: "EV",
     sublabel: "CHARGING",
-    icon: "/icons/ev.svg",
-    bgImage: "/backgrounds/ev-bg.svg",
+    icon: `${BASE}icons/ev.svg`,
+    bgImage: `${BASE}backgrounds/ev-bg.svg`,
     titlePrefix: "UNDERSTANDING",
     titleMain: "EV CHARGING",
   },
@@ -46,8 +48,8 @@ export const TOPICS: Topic[] = [
     id: "battery",
     label: "BATTERY",
     sublabel: "STORAGE",
-    icon: "/icons/battery.svg",
-    bgImage: "/backgrounds/battery-bg.svg",
+    icon: `${BASE}icons/battery.svg`,
+    bgImage: `${BASE}backgrounds/battery-bg.svg`,
     titlePrefix: "UNDERSTANDING",
     titleMain: "BATTERY STORAGE",
   },
@@ -55,8 +57,8 @@ export const TOPICS: Topic[] = [
     id: "ai",
     label: "AI IN",
     sublabel: "ENERGY",
-    icon: "/icons/ai.svg",
-    bgImage: "/backgrounds/ai-bg.svg",
+    icon: `${BASE}icons/ai.svg`,
+    bgImage: `${BASE}backgrounds/ai-bg.svg`,
     titlePrefix: "UNDERSTANDING",
     titleMain: "AI IN ENERGY",
   },

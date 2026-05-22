@@ -5,6 +5,8 @@ import { MicIndicator } from "../components/MicIndicator";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 
+const BASE = import.meta.env.BASE_URL;
+
 interface AskQuestionsScreenProps {
   avatar: UseAkoolAvatarReturn;
   messages: AgentMessage[];
@@ -17,7 +19,7 @@ export function AskQuestionsScreen({ avatar, messages, isListening, isSpeaking, 
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
-      <img src="/assets/menu-city-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
+      <img src={`${BASE}assets/menu-city-bg.png`} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
       {/* Back button */}

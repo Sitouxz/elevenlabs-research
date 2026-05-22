@@ -3,6 +3,8 @@ import { LumiAvatar } from "../components/LumiAvatar";
 import { MicIndicator } from "../components/MicIndicator";
 import type { UseAkoolAvatarReturn } from "../hooks/useAkoolAvatar";
 
+const BASE = import.meta.env.BASE_URL;
+
 interface SummaryItem {
   category: string;
   value: string;
@@ -27,14 +29,14 @@ export function SummaryScreen({
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Figma city background */}
-      <img src="/assets/menu-city-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
+      <img src={`${BASE}assets/menu-city-bg.png`} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: "blur(10px) brightness(0.8)", transform: "scale(1.05)" }} />
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
       {/* Glow ellipse behind Lumi — Figma Ellipse 1: x=1625(42.3%), y=595(27.5%), w=872(22.7%), h=1466(67.9%) */}
       <div
         className="absolute pointer-events-none"
         style={{
-          left: "42.3%",
+          left: "8%",
           top: "27.5%",
           width: "22.7vw",
           height: "67.9vh",
@@ -47,10 +49,10 @@ export function SummaryScreen({
       {/* Content — absolute positioning to match Figma */}
       <div className="relative z-10 w-full h-full">
 
-        {/* CENTER: Lumi avatar — centered at ~50% horizontally */}
+        {/* LEFT: Lumi avatar — anchored to left side */}
         <motion.div
-          className="absolute bottom-0 left-0 right-0 flex items-end justify-center"
-          style={{ top: 0 }}
+          className="absolute bottom-0 flex items-end"
+          style={{ left: "0%", width: "48%" }}
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
@@ -70,7 +72,7 @@ export function SummaryScreen({
         {/* Mic indicator */}
         <motion.div
           className="absolute z-20"
-          style={{ left: "44%", top: "63.8%" }}
+          style={{ left: "22%", top: "63.8%" }}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5 }}
@@ -81,7 +83,7 @@ export function SummaryScreen({
         {/* Summary content overlay — positioned on the right side */}
         <motion.div
           className="absolute flex flex-col"
-          style={{ right: "4%", top: "10%", width: "35%" }}
+          style={{ right: "4%", top: "10%", width: "44%" }}
           initial={{ opacity: 0, x: 40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7 }}
