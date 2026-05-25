@@ -248,7 +248,11 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const recentUserTranscriptsRef = useRef<{ norm: string; at: number }[]>([]);
 
   // Append a user transcript to the chat log, deduping against recently seen
-  // transcripts in BOTH the ref cache (primary) and the message list (backup).
+  // transcripts via the ref cache. The ref cache is the SYNCHRONOUS source of
+  // truth — we MUST NOT rely on a closure variable set inside a setMessages
+  // updater, because in React 18 the updater is called during the batched
+  // commit (after the current synchronous frame), so the variable would still
+  // hold its initial value when the function returns.
   const appendUserMessage = useCallback((text: string): boolean => {
     const trimmed = text.trim();
     if (!trimmed) return false;
@@ -261,34 +265,20 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       (e) => now - e.at < DEDUPE_WINDOW_MS
     );
 
-    // Primary dedupe: ref cache. Match exact, prefix, or substring containment.
+    // Synchronous dedupe via ref cache. Match exact, prefix, or substring.
     for (const entry of recentUserTranscriptsRef.current) {
       if (entry.norm === norm) return false;
       if (norm.length > 6 && (entry.norm.includes(norm) || norm.includes(entry.norm))) return false;
     }
 
-    // Record immediately so any synchronous follow-up call (different path,
-    // same utterance) sees this transcript before its setMessages runs.
+    // Commit to cache BEFORE scheduling the React update so any synchronous
+    // follow-up call (different intake path, same utterance) is deduped.
     recentUserTranscriptsRef.current.push({ norm, at: now });
 
-    let appended = false;
-    setMessages((prev) => {
-      // Backup dedupe: scan the last 5 user messages within the window.
-      const cutoff = now - DEDUPE_WINDOW_MS;
-      let userChecked = 0;
-      for (let i = prev.length - 1; i >= 0 && userChecked < 5; i--) {
-        const m = prev[i];
-        if (m.role !== "user") continue;
-        userChecked++;
-        if (m.timestamp < cutoff) break;
-        const mNorm = normalizeTranscript(m.text);
-        if (mNorm === norm) return prev;
-        if (norm.length > 6 && (mNorm.includes(norm) || norm.includes(mNorm))) return prev;
-      }
-      appended = true;
-      return [...prev, { role: "user", text: trimmed, timestamp: now }];
-    });
-    return appended;
+    // Schedule the chat-log append. No closure variable — we already know
+    // we're appending because the cache check passed.
+    setMessages((prev) => [...prev, { role: "user", text: trimmed, timestamp: now }]);
+    return true;
   }, [normalizeTranscript]);
   const dispatchFxRef = useRef<(userText: string, opts?: { hidden?: boolean }) => Promise<void>>(async () => {});
   const fxQueuedHiddenRef = useRef<boolean>(false);
@@ -583,6 +573,18 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               lastTtsEndRef.current = Date.now();
               if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
               const generationAtEnd = speakingGenerationRef.current;
+              // Restart browser SR IMMEDIATELY — it uses the system mic directly
+              // (independent of Agora mic publish state). Initial-echo capture is
+              // filtered by the 300ms cooldown gate in onresult and the content-
+              // based echo filter. This is the critical fix: don't make the user
+              // wait 800ms after the avatar stops speaking before being heard.
+              if (speechRecRef.current) {
+                speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
+                try { speechRecRef.current.start(); } catch { /* already running */ }
+              }
+              setIsListening(true);
+              // Agora mic unmute is delayed slightly to dodge speaker-decay echo
+              // into the published mic track (which Akool's server STT consumes).
               unmutePendingRef.current = setTimeout(() => {
                 unmutePendingRef.current = null;
                 if (isSpeakingRef.current) {
@@ -594,12 +596,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                   return;
                 }
                 unmuteMic(agoraClientRef.current, micTrackRef.current);
-                if (speechRecRef.current) {
-                  speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
-                  try { speechRecRef.current.start(); } catch { /* already running */ }
-                }
-                setIsListening(true);
-              }, 800);
+              }, 250);
             }
           }
 
@@ -639,7 +636,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               // playing (when it fires between two back-to-back responses), causing audio_end
               // to see isSpeakingRef=false and skip the unmute entirely. The generation check
               // inside the timer is the real guard against a premature unmute.
-              console.log("[Akool] Audio end detected (TTS fallback) - will unmute shortly");
+              console.log("[Akool] Audio end detected (TTS fallback) - resuming SR immediately");
               isSpeakingRef.current = false;
               setIsSpeaking(false);
               speakingMuteRef.current = false;
@@ -647,6 +644,12 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
               systemPromptUnmutePendingRef.current = false;
               if (unmutePendingRef.current) clearTimeout(unmutePendingRef.current);
               const generationAtEnd = speakingGenerationRef.current;
+              // Restart browser SR immediately (system mic, not Agora-bound).
+              if (speechRecRef.current) {
+                speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
+                try { speechRecRef.current.start(); } catch { /* already running */ }
+              }
+              setIsListening(true);
               unmutePendingRef.current = setTimeout(() => {
                 unmutePendingRef.current = null;
                 if (isSpeakingRef.current) {
@@ -658,12 +661,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                   return;
                 }
                 unmuteMic(agoraClientRef.current, micTrackRef.current);
-                if (speechRecRef.current) {
-                  speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
-                  try { speechRecRef.current.start(); } catch { /* already running */ }
-                }
-                setIsListening(true);
-              }, 800);
+              }, 250);
             }
           }
 
@@ -765,7 +763,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                       systemPromptUnmutePendingRef.current = false;
                       unmuteMic(agoraClientRef.current, micTrackRef.current);
                       if (speechRecRef.current) {
-                        speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
+                        speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
                         try { speechRecRef.current.start(); } catch { /* already running */ }
                       }
                       setIsListening(true);
@@ -826,7 +824,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
                         // Use unmuteMic for proper Agora publish flow
                         unmuteMic(agoraClientRef.current, micTrackRef.current);
                         if (speechRecRef.current) {
-                          speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
+                          speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
                           try { speechRecRef.current.start(); } catch { /* already running */ }
                         }
                         setIsListening(true);
@@ -958,7 +956,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
           }
           unmuteMic(agoraClientRef.current, micTrackRef.current);
           if (speechRecRef.current) {
-            speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
+            speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
             try { speechRecRef.current.start(); } catch { /* already running */ }
           }
           setIsListening(true);
@@ -975,12 +973,37 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
         rec.onresult = (event: any) => {
           const result = event.results[event.resultIndex];
           if (!result?.isFinal) return;
+          // Hard block while avatar is mid-TTS — SR shouldn't be capturing,
+          // but defensively drop any result that slips through.
           if (isSpeakingRef.current) return;
-          if (Date.now() - lastTtsEndRef.current < 1500) return;
+          // Short cooldown to skip the ~200ms audio-decay echo from speakers
+          // right after TTS ends. Anything beyond that is real user speech.
+          if (Date.now() - lastTtsEndRef.current < 300) return;
           const confidence = result[0].confidence ?? 1;
           if (confidence < 0.6) return;
           const transcript = result[0].transcript.trim();
           if (transcript.length < 2) return;
+          // Content-based echo defense: if the captured transcript is long
+          // (>= 20 chars) AND substantially overlaps a recent bot utterance,
+          // treat as echo. The length gate prevents false positives on short
+          // user prompts like "solar energy" that happen to be substrings of
+          // longer bot replies.
+          const tLower = transcript.toLowerCase();
+          if (tLower.length >= 20) {
+            const isEcho = recentBotTextsRef.current.some((botText) => {
+              if (botText.length < 10) return false;
+              if (botText.includes(tLower) || tLower.includes(botText)) return true;
+              const tWords = new Set(tLower.split(/\s+/));
+              const bWords = botText.split(/\s+/);
+              if (bWords.length < 4) return false;
+              const overlap = bWords.filter((w) => tWords.has(w)).length;
+              return overlap / Math.max(tWords.size, bWords.length) > 0.6;
+            });
+            if (isEcho) {
+              if (import.meta.env.DEV) console.log("[Akool] Browser STT echo suppressed:", transcript);
+              return;
+            }
+          }
           if (import.meta.env.DEV) console.log("[Akool] Browser STT accepted:", transcript);
           const sttAdded = appendUserMessage(transcript);
           if (sttAdded && FX_LLM_ENABLED) dispatchFx(transcript);
@@ -1124,7 +1147,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
             }
             unmuteMic(agoraClientRef.current, micTrackRef.current);
             if (speechRecRef.current) {
-              speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
+              speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
               try { speechRecRef.current.start(); } catch { /* already running */ }
             }
             setIsListening(true);
@@ -1145,7 +1168,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       if (!isSpeakingRef.current) {
         unmuteMic(agoraClientRef.current, micTrackRef.current);
         if (speechRecRef.current) {
-          speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
+          speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
           try { speechRecRef.current.start(); } catch { /* already running */ }
         }
         setIsListening(true);
@@ -1187,7 +1210,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
       speechRecRef.current.onend = null;
       try { speechRecRef.current.stop(); } catch { /* already stopped */ }
       // NEVER auto-restart if avatar is speaking - check isSpeakingRef
-      speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 200); };
+      speechRecRef.current.onend = () => { if (!speechRecRef.current) return; setTimeout(() => { if (!speechRecRef.current) return; try { speechRecRef.current!.start(); } catch { /* already started or destroyed */ } }, 50); };
     }
     setIsListening(false);
   }, []);

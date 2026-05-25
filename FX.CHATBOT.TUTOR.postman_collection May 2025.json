@@ -1,0 +1,4145 @@
+{
+	"info": {
+		"_postman_id": "a67bf811-7975-41cd-bb06-d2739101ffc4",
+		"name": "FX CHATBOT TUTOR",
+		"description": "**SIT CHATBOT TUTOR** is an API that provides chatting with AI purposes\n\nEndpoint features include:\n\n1. User\n    \n    1. Register\n        \n    2. Delete\n        \n    3. Search\n        \n    4. Details\n        \n    5. Update\n        \n    6. Import\n        \n    7. Delete All\n        \n2. Authentication\n    \n    1. Login\n        \n    2. Token\n        1. Update\n            \n        2. Refresh\n            \n3. PDF\n    \n    1. List\n        \n    2. Upload\n        \n    3. Delete\n        \n    4. Enable / Disable\n        \n4. Model\n    \n    1. List All\n        \n    2. Chat\n        \n5. Prompt\n    \n    1. Get\n        \n    2. Update\n        \n\nTake notice at the **HTTP Status Codes**, if it does not start from the accepted codes 200s, the service does not comply to the input you are giving.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "26504175"
+	},
+	"item": [
+		{
+			"name": "User",
+			"item": [
+				{
+					"name": "register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\"name\":\"MG\",\r\n\"email\":\"mg@gmail.com\",\r\n\"role\":\"User\",\r\n\"condition\":\"C1,C2\",\r\n\"gender\":\"Male\",\r\n\"status\":\"Active\",\r\n\"password\":\"123\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "delete",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjEzYjNiYmY2MTQxMDQ1OTgxODM0NWIiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6ImthcmltQGZ4bXdlYi5jb20iLCJyb2xlIjoiVXNlciIsImNvbmRpdGlvbiI6IkMxIiwiZ2VuZGVyIjoiTWFsZSIsInN0YXR1cyI6IkFjdGl2ZSIsImV4cCI6MTcxMjYyNzY4OSwiaWF0IjoxNzEyNjI0MDg5fQ.0NHu3aETaQJUBmrIFGcsa1ZAVTFtUSzUd0ylK2SjXbQ",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "[\r\n  \"661491b54372741e041a91c9\"\r\n]",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/delete",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"delete"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "search",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/search?role=&sortBy=updatedDate&sortOrder=desc&page=1&perPage=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"search"
+							],
+							"query": [
+								{
+									"key": "role",
+									"value": ""
+								},
+								{
+									"key": "sortBy",
+									"value": "updatedDate"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "perPage",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "detail",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjE0M2U2YjA0MGMzMzI3NzAxY2IwZGYiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6ImthcmltQGZ4c213ZWIuY29tIiwicm9sZSI6IlVzZXIiLCJjb25kaXRpb24iOiJDMSxDMiIsImdlbmRlciI6Ik1hbGUiLCJzdGF0dXMiOiJBY3RpdmUiLCJleHAiOjE3MTI2MTk5ODMsImlhdCI6MTcxMjYxNjM4M30.XcPi_CxFLSmPlIN_9GLWhY_w_YdjvOjdhRi2owS0Xtk",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/detail/66134e1526efe92bd8bb03c2",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"detail",
+								"66134e1526efe92bd8bb03c2"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "update",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjE0M2U2YjA0MGMzMzI3NzAxY2IwZGYiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6ImthcmltQGZ4c213ZWIuY29tIiwicm9sZSI6IlVzZXIiLCJjb25kaXRpb24iOiJDMSxDMiIsImdlbmRlciI6Ik1hbGUiLCJzdGF0dXMiOiJBY3RpdmUiLCJleHAiOjE3MTI2MTc2OTEsImlhdCI6MTcxMjYxNDA5MX0.hrRit7Wk6lb9nxz3Xh292bIRy_JICw_8ioci5rdBTE4",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\"name\":\"Karim\",\r\n\"email\":\"karim@fxmweb2.com\",\r\n\"role\":\"User\",\r\n\"condition\":\"C1,C2\",\r\n\"gender\":\"Male\",\r\n\"status\":\"Active\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/update/66134e1526efe92bd8bb03c2",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"update",
+								"66134e1526efe92bd8bb03c2"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "import",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "csv",
+									"type": "file",
+									"src": "1WvUJnrRv/sit-user-chatbot.csv"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/import",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"import"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "delete all",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/delete-all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"delete-all"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"mg@gmail.com\",\r\n    \"password\": \"123\"\r\n    // \"userName\": \"kenny@gmail.com\",\r\n    // \"password\": \"kenny1234@\"\r\n    // \"userName\": \"mario@fxmweb.com\",\r\n    // \"password\": \"mario1234@\"\r\n    // \"userName\": \"monika@fxmweb.com\",\r\n    // \"password\": \"monika1234@\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "updatetoken",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjEzNGFjNTZjODU0YzRmOTg2OTU4MGYiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6ImthcmltQGZ4bXdlYi5jb20iLCJyb2xlIjoiVXNlciIsImNvbmRpdGlvbiI6IkMxIiwiZ2VuZGVyIjoiTWFsZSIsInN0YXR1cyI6IkFjdGl2ZSIsImV4cCI6MTcxMjU0NDMyMywiaWF0IjoxNzEyNTQwNzIzfQ.5dDDEBEfYlEc_lQd2nL0-HGBE7RpMk3naSz6-01vNbc",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/updatetoken",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"updatetoken"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "refreshtoken",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjEzMzRjZGM0MTQ2YTUzYThlNTQyNTYiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6IlVzZXIiLCJyb2xlIjoiVXNlciIsImNvbmRpdGlvbiI6IkMxIiwiZ2VuZGVyIjoiTWFsZSIsInN0YXR1cyI6IkFjdGl2ZSIsImV4cCI6MTcxMjUzOTgzMSwiaWF0IjoxNzEyNTM2MjMxfQ.ld0BJSV41I3l2Swr7HdTRDVuuCcamNQQljNG4FXyV4M",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/refreshtoken?refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpmYVdRaU9pSTJOakV6TXpSalpHTTBNVFEyWVRVellUaGxOVFF5TlRZaUxDSnVZVzFsSWpvaVMyRnlhVzBpTENKbGJXRnBiQ0k2SWxWelpYSWlMQ0p5YjJ4bElqb2lWWE5sY2lJc0ltTnZibVJwZEdsdmJpSTZJa014SWl3aVoyVnVaR1Z5SWpvaVRXRnNaU0lzSW5OMFlYUjFjeUk2SWtGamRHbDJaU0lzSW1WNGNDSTZNVGN4TWpVek9UZ3pNU3dpYVdGMElqb3hOekV5TlRNMk1qTXhmUS5sZDBCSlNWNDFJM2wyU3dyN0hkVFJEVnV1Q2NhbU5RUWxqTkc0Rlh5VjRNIiwiaWF0IjoxNzEyNTM2MjMxfQ.eTFaqcntKGZL0g_wImpRTzFqk8hPP8kWggVv2MnmYks",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"refreshtoken"
+							],
+							"query": [
+								{
+									"key": "refreshToken",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpmYVdRaU9pSTJOakV6TXpSalpHTTBNVFEyWVRVellUaGxOVFF5TlRZaUxDSnVZVzFsSWpvaVMyRnlhVzBpTENKbGJXRnBiQ0k2SWxWelpYSWlMQ0p5YjJ4bElqb2lWWE5sY2lJc0ltTnZibVJwZEdsdmJpSTZJa014SWl3aVoyVnVaR1Z5SWpvaVRXRnNaU0lzSW5OMFlYUjFjeUk2SWtGamRHbDJaU0lzSW1WNGNDSTZNVGN4TWpVek9UZ3pNU3dpYVdGMElqb3hOekV5TlRNMk1qTXhmUS5sZDBCSlNWNDFJM2wyU3dyN0hkVFJEVnV1Q2NhbU5RUWxqTkc0Rlh5VjRNIiwiaWF0IjoxNzEyNTM2MjMxfQ.eTFaqcntKGZL0g_wImpRTzFqk8hPP8kWggVv2MnmYks"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "PDF",
+			"item": [
+				{
+					"name": "List PDFs",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pdf",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pdf"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List PDFs by Passphrase",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pdf/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pdf",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload PDF",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200 or 404\", function () {\r",
+									"    pm.expect(pm.response.to.have.status(200) || pm.response.to.have.status(404));\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "files",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pdf/upload",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pdf",
+								"upload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Enable and Disable PDF",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pdf/enable/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pdf",
+								"enable",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "6674e7776a0593d7eadea213"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete PDF in Service",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjYyNzBjYzg4MzczMGYwNGYwY2Q2ZjMiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6ImthcmltQGdtYWlsLmNvbSIsInJvbGUiOiJVc2VyIiwiY29uZGl0aW9uIjoiQzEsQzIiLCJnZW5kZXIiOiJNYWxlIiwic3RhdHVzIjoiQWN0aXZlIiwiZXhwIjoxNzE4MjYyNTkxLCJpYXQiOjE3MTgyNTg5OTF9.m7om41LTx5iKS4UrLFI9_F8W9Ip4gjS1oa9yY6ISiYk",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pdf/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"pdf",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "666a66e53bdad03e98e15df2"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Model",
+			"item": [
+				{
+					"name": "List All LLM Models",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/model/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"model",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Config",
+			"item": [
+				{
+					"name": "List Configs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch Configs by Passphrase",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config/passphrase/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"passphrase",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch Config by Config Database ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config/id/:config_id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"id",
+								":config_id"
+							],
+							"variable": [
+								{
+									"key": "config_id",
+									"value": "6684bcfb28f06b9b4046404b"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch Configs by Passphrase and Language",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/config/passphrase/:passphrase/language/:language",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								"passphrase",
+								":passphrase",
+								"language",
+								":language"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "language",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create New Config",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \n  \"name\": \"Aisyah\",\n  \"language\": \"Indonesian\",\n  \"model\": \"gpt-4o-mini\",\n  \"prompt_template\": \"You are {name}. \\nBe polite and friendly.\\nSpeak as if having a conversation with a human-like response.\\nBe very natural.\\n\\nUse markdown syntax in your answer and bold every important point in your answer.\\nAnswer the question in detail from the given context but keep it brief and simple, no more than 200 characters, making sure to provide all details. If the question is not in the provided context just say, \\\"I'm not sure what you mean by '{question}'. Could you please provide more context or clarify your question? I'll do my best to assist you once I understand what you're looking for\\\", don't provide the wrong answer.\\n\\nContext:\\n{context}\\n\\nQuestion:\\n{question}\\n\\nAnswer:\",\n  \"temperature\": 0.2,\n  \"voice_type\": \"onyx\",\n  \"app_id\": {{microlearning_app_id}},\n  \"avatar_id\": \"{{avatar_id}}\",\n  \"passphrase\": \"{{passphrase}}\"\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/config",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Config",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"language\": \"Indonesian\",\n    \"prompt_template\": \"You are {name}, a customer service from Bank Mandiri. \\nBe polite and friendly.\\nSpeak as if having a conversation with a human-like response.\\nBe very natural.\\n\\nUse markdown syntax in your answer and bold every important point in your answer.\\nAnswer the question in absolute detail from the given context but keep it brief and simple. Don't provide the wrong answer.\\n\\nContext:\\n{context}\\n\\nQuestion:\\n{question}\\n\\nAnswer:\" \n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/config/:config_id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								":config_id"
+							],
+							"variable": [
+								{
+									"key": "config_id",
+									"value": "66b2fc1219bc4765b2675378"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Config",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}/api/config/:config_id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"config",
+								":config_id"
+							],
+							"variable": [
+								{
+									"key": "config_id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Math Config",
+			"item": [
+				{
+					"name": "Get Math Config",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/math-config",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"math-config"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Math Config",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"icebreakingPrompt\": \"Greet me back and ask me an icebreaking question to get to know me better with excitement, for example, ask me if I have eaten or not.\",\n    \"icebreakingEndPrompt\": \"Respond to my previous chat with excitement and no questions, and then say that by the way the chat was cool, and ask me if I want to play games or keep chatting.\",\n    \"gameWinningPrompt\": \"Tell me that I am advancing to the next level, compliment me in excitement, saying I am in a good progress!\",\n    \"gameLosingWithMoreThan80PercentagePrompt\": \"Tell me that I am staying at the same level, but I delivered an impressive performance. Tell me to keep up my fantastic work as I am on the right track!\",\n    \"gameLosingWith61To80PercentagePrompt\": \"Tell me that I am staying at the same level and that my effort was commendable. Motivate me to keep pushing and tell me that I will break through the next level soon!\",\n    \"gameLosingWith60AndLessPercentagePrompt\": \"Tell me that I am staying at the same level, tell me to use this chance to reflect and come back stronger as my breakthrough is just around the corner!\",\n    \"chattingPrompt\": \"Reply that you are happy, and you are glad that I want to keep chatting, and ask me what do I wanna talk about\",\n    \"gamesPrompt\": \"Say alright with an excited tone and invite me to play some games!\",\n    \"maxQuest\": 5\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/math-config",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"math-config"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Math Config",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"icebreakingPrompt\": \"Greet me back and ask me an icebreaking question to get to know me better with excitement, for example, ask me if I have eaten or not.\",\n    \"icebreakingEndPrompt\": \"Respond to my previous chat with excitement and no questions, and then say that by the way the chat was cool, and ask me if I want to play games or keep chatting.\",\n    \"gameWinningPrompt\": \"Tell me that I am now advancing to the next level, compliment me in excitement, saying I am in a good progress!\",\n    \"gameLosingWithMoreThan80PercentagePrompt\": \"First me that I unfortunately am now staying at the same level. Then, tell me that I delivered an impressive performance. Finally, tell me to keep up my fantastic work as I am on the right track!\",\n    \"gameLosingWith61To80PercentagePrompt\": \"First me that I unfortunately am now staying at the same level. Then, tell me that my effort was commendable. Finally, motivate me to keep pushing and tell me that I will break through this level soon!\",\n    \"gameLosingWith60AndLessPercentagePrompt\": \"First me that I unfortunately am now staying at the same level. Then, tell me to use this chance to reflect and come back stronger as my breakthrough is just around the corner!\",\n    \"chattingPrompt\": \"Reply that you are happy, and you are glad that I want to keep chatting, and ask me what do I wanna talk about\",\n    \"gamesPrompt\": \"Say alright with an excited tone and invite me to play some games!\",\n    \"maxQuest\": 5\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/math-config",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"math-config"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Chat (Front-End)",
+			"item": [
+				{
+					"name": "Chat [Obselete]",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NjNjNmZiZGM1MTA1MzVmYWIwMDQ3YjYiLCJuYW1lIjoiS2FyaW0iLCJlbWFpbCI6ImthcmltQGdtYWlsLmNvbSIsInJvbGUiOiJVc2VyIiwiY29uZGl0aW9uIjoiQzEsQzIiLCJnZW5kZXIiOiJNYWxlIiwic3RhdHVzIjoiQWN0aXZlIiwiZXhwIjoxNzE3NTk2NDIzLCJpYXQiOjE3MTc1OTI4MjN9.3Xh9yKq9iQTfCgfG8VlUo32cM6tFlfY3B1MSYNXopiw",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "What is this image?",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"What is the liability total in 2024?\"}, {\"ai\":\"The total liability in 2024 is $101,799,998.00. This includes current liabilities of $101,799,998.00, which consists of payables such as Hutang Dagang, Hutang Penggajian, and Hutang Pihak III. Additionally, the total equity in 2024 is $2,956,836,775.15, which includes unallocated earnings and retained earnings. So, when you add the total liabilities and total equity together, you get the total liabilities + equity of $3,058,636,773.15. That's a lot of numbers, right? 😅\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/bacteria-3.jpg"
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_dall_e",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat/:configId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat",
+								":configId"
+							],
+							"variable": [
+								{
+									"key": "configId",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Math Chatbot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "hi! who are you?",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"hi!\"}, {\"ai\": \"Hey there! Great to see you! Have you had a chance to grab some lunch yet? I'm starving!\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "activity",
+									"value": "chatting",
+									"type": "text"
+								},
+								{
+									"key": "activity_count",
+									"value": "4",
+									"type": "text"
+								},
+								{
+									"key": "percentage",
+									"value": "81",
+									"type": "text"
+								},
+								{
+									"key": "games_previous_stage",
+									"value": "4",
+									"type": "text"
+								},
+								{
+									"key": "games_current_stage",
+									"value": "4",
+									"type": "text"
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=6&app_id={{math_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "6"
+								},
+								{
+									"key": "app_id",
+									"value": "{{math_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Scenario LLM",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "sleeping",
+									"type": "text"
+								},
+								{
+									"key": "scenario",
+									"value": "1",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{scenario_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{scenario_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "RAG Chatbot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "I finished the entire course in just one minute!",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"ai\":\"Hey there! 😊 What did you have for breakfast or lunch today? I'm super curious!\"},{\"user\":\"what is sin 90?\"},{\"ai\":\"Sin 90 is 1! That's a nice little fact to remember.\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "activity",
+									"value": "icebreaker",
+									"type": "text"
+								},
+								{
+									"key": "activity_count",
+									"value": "3",
+									"type": "text"
+								},
+								{
+									"key": "expression_model",
+									"value": "gpt-4o",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{rag_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{rag_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "RAG Chatbot Stream",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "I finished the entire course in just one minute!",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"ai\":\"Hey there! 😊 What did you have for breakfast or lunch today? I'm super curious!\"},{\"user\":\"what is sin 90?\"},{\"ai\":\"Sin 90 is 1! That's a nice little fact to remember.\"}]",
+									"type": "text"
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "activity",
+									"value": "icebreaker",
+									"type": "text"
+								},
+								{
+									"key": "activity_count",
+									"value": "3",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat/stream?passphrase={{passphrase}}&config_id=1&app_id={{rag_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat",
+								"stream"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{rag_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "RAG Chatbot with Media Search",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "where is apartment in hollywood",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"hi!\"}, {\"ai\": \"Hey there! It's so great to see you! Have you had anything delicious to eat today? I always love hearing about people's favorite meals!\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_media_search",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{rag_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{rag_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "RAG Chatbot + Image",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "what is this picture",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"hi!\"}, {\"ai\": \"Hey there! It's so great to see you! Have you had anything delicious to eat today? I always love hearing about people's favorite meals!\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/apartment.png"
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{rag_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{rag_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "General Chatbot + Image",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "what is this picture",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"hi!\"}, {\"ai\": \"Hey there! It's so great to see you! Have you had anything delicious to eat today? I always love hearing about people's favorite meals!\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/apartment.png"
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{rag_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{rag_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "RAG Chatbot + Image + DALL e",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "can you generate me an image of a cat",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"hi!\"}, {\"ai\": \"Hey there! It's so great to see you! Have you had anything delicious to eat today? I always love hearing about people's favorite meals!\"}]",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": [],
+									"disabled": true
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "use_dall_e",
+									"value": "true",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{rag_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{rag_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "General Chatbot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "you look cool!",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"Hi who are you?\"}, {\"ai\": \"Hello! I'm Ahmad Malik, a civil engineer from Jordan. I focus on engineering projects and enjoy discussing topics related to my field.\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_expression",
+									"value": "true",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=10&app_id={{general_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "10"
+								},
+								{
+									"key": "app_id",
+									"value": "{{general_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Microlearning Material Chatbot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"topic\": \"What is NUS?\",\n    \"topic_description\": \"Teach an Indonesian citizen\",\n    \"additional_instructions\": \"Add 4 chapters with 200 words each\",\n    \"type\": \"material\",\n    \"add_chapters\": true,\n    //Optional\n    \"pdf_id\": \"{{pdf_id}}\"\n    // \"add_chapters\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=1&app_id={{microlearning_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "1"
+								},
+								{
+									"key": "app_id",
+									"value": "{{microlearning_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Microlearning Quiz Chatbot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"topic\": \"What is NUS?\",\n    // Optional\n    \"topic_description\": \"Teach an Indonesian kid\",\n    // Optional\n    // \"additional_instructions\": \"Make the content 150-200 words\",\n    \"type\": \"quiz\",\n    // Recommended: no chapters\n    // \"add_chapters\": false\n    \"add_chapters\": true,\n    //Optional\n    \"pdf_id\": \"{{pdf_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat?passphrase={{passphrase}}&config_id=2&app_id={{microlearning_app_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat"
+							],
+							"query": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								},
+								{
+									"key": "config_id",
+									"value": "2"
+								},
+								{
+									"key": "app_id",
+									"value": "{{microlearning_app_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Chat Metadata",
+			"item": [
+				{
+					"name": "Fetch Chat Metadatas with Passphrase",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "prompt",
+									"value": "What is this image?",
+									"type": "text"
+								},
+								{
+									"key": "chat_history",
+									"value": "[{\"user\": \"What is the liability total in 2024?\"}, {\"ai\":\"The total liability in 2024 is $101,799,998.00. This includes current liabilities of $101,799,998.00, which consists of payables such as Hutang Dagang, Hutang Penggajian, and Hutang Pihak III. Additionally, the total equity in 2024 is $2,956,836,775.15, which includes unallocated earnings and retained earnings. So, when you add the total liabilities and total equity together, you get the total liabilities + equity of $3,058,636,773.15. That's a lot of numbers, right? 😅\"}]",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/bacteria-3.jpg"
+								},
+								{
+									"key": "use_audio",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "use_dall_e",
+									"value": "true",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat-metadata/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat-metadata",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Cost",
+			"item": [
+				{
+					"name": "LLM",
+					"item": [
+						{
+							"name": "Fetch All LLM Costs",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cost/llm/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"llm",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Fetch Specific LLM Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cost/llm/:model_name",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"llm",
+										":model_name"
+									],
+									"variable": [
+										{
+											"key": "model_name",
+											"value": "gpt-4o"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create LLM Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"charCountForOneToken\": 3,\n    \"requestCostPerToken\": 0.00005,\n    \"responseCostPerToken\": 0.000015\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/llm/:model_name",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"llm",
+										":model_name"
+									],
+									"variable": [
+										{
+											"key": "model_name",
+											"value": "claude-3-5-sonnet-20240620"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update LLM Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"charCountForOneToken\": 3,\n    \"requestCostPerToken\": 0.5,\n    \"responseCostPerToken\": 0.15\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/llm/:model_name",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"llm",
+										":model_name"
+									],
+									"variable": [
+										{
+											"key": "model_name",
+											"value": "gpt-4o"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete LLM Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"charCountForOneToken\": 3,\n    \"requestCostPerToken\": 0.00005,\n    \"responseCostPerToken\": 0.000015\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/llm/:model_name",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"llm",
+										":model_name"
+									],
+									"variable": [
+										{
+											"key": "model_name",
+											"value": "gpt-4o"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Audio",
+					"item": [
+						{
+							"name": "Fetch All Audio Costs",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"costPerCharacter\": 0.00005\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/audio",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"audio"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Fetch Specific Audio Cost Copy",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"costPerCharacter\": 0.00005\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/audio/:audio_provider",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"audio",
+										":audio_provider"
+									],
+									"variable": [
+										{
+											"key": "audio_provider",
+											"value": "ELEVEN_LABS"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Audio Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"costPerCharacter\": 0.00005\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/audio/:audio_provider",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"audio",
+										":audio_provider"
+									],
+									"variable": [
+										{
+											"key": "audio_provider",
+											"value": "ELEVEN_LABS"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Audio Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"costPerCharacter\": 0.002\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/audio/:audio_provider",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"audio",
+										":audio_provider"
+									],
+									"variable": [
+										{
+											"key": "audio_provider",
+											"value": "ELEVEN_LABS"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Audio Cost",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"costPerCharacter\": 0.002\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cost/audio/:audio_provider",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"cost",
+										"audio",
+										":audio_provider"
+									],
+									"variable": [
+										{
+											"key": "audio_provider",
+											"value": "ELEVEN_LABS"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Fetch Costs from Passphrase",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cost/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cost",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Feedback",
+			"item": [
+				{
+					"name": "Create",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"link\": \"https://example.com/feedback\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/feedback/create",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"feedback",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"link\": \"https://example.com/feedback\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/feedback/update/664eb980d01e291a703233e1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"feedback",
+								"update",
+								"664eb980d01e291a703233e1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/feedback/delete/664eb980d01e291a703233e1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"feedback",
+								"delete",
+								"664eb980d01e291a703233e1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/feedback/list",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"feedback",
+								"list"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Key",
+			"item": [
+				{
+					"name": "List Keys",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/key",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"key"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Key",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Development API Key 2\",\n    \"description\": \"This API key is used for lorem ipsum\",\n    \"app_ids\": [1]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/key",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"key"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Key",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Development API Key 2 Updated\",\n    \"description\": \"This API key is used for ipsum lorem\",\n    \"app_ids\": [1,2,3]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/key/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"key",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "6673917e6fd2ac0f2c3e72b0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete a Key",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/key/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"key",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "6677c52cf80add41084463bb"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "App",
+			"item": [
+				{
+					"name": "Fetch All Apps",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/app",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create an App",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Chatbot3\",\n    \"description\": \"General Knowledge + Custom Knowledge + Vision + Image Generation + Audio Generation Feature\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/app",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update App",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"ChatGPT\",\n    \"description\": \"Similar to usual ChatGPT\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/app/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "2"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete App",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/app/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Avatar",
+			"item": [
+				{
+					"name": "Get All Avatars",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/avatar/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Avatars by Passphrase",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/avatar/passphrase/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								"passphrase",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Avatar by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/avatar/id/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								"id",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Avatar by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Yoseph",
+									"type": "text"
+								},
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": "/Users/jxnhiro/Documents/fxmedia-files/person-3.jpg",
+									"disabled": true
+								},
+								{
+									"key": "gender",
+									"value": "Male",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/avatar/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "66b4d1ede30dee69331d5dcd"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Avatar by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/avatar/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Avatar",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Samantha",
+									"type": "text"
+								},
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": "/Users/jxnhiro/Documents/fxmedia-files/person-1.jpg"
+								},
+								{
+									"key": "gender",
+									"value": "female",
+									"type": "text"
+								},
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/avatar/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Make Animation from Avatar ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatars",
+									"type": "file",
+									"src": [
+										"/Users/jxnhiro/Documents/fxmedia-files/person-1.jpg",
+										"/Users/jxnhiro/Documents/fxmedia-files/person-2.jpg",
+										"/Users/jxnhiro/Documents/fxmedia-files/person-3.jpg"
+									]
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/avatar/animations/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								"animations",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "66b4d4417ff3847dc771aca2"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Testing",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatars",
+									"type": "file",
+									"src": [
+										"/Users/jxnhiro/Documents/fxmedia-files/person-1.jpg",
+										"/Users/jxnhiro/Documents/fxmedia-files/person-2.jpg",
+										"/Users/jxnhiro/Documents/fxmedia-files/person-3.jpg"
+									]
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/avatar/testing/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"avatar",
+								"testing",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "66b4d4417ff3847dc771aca2"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Expression",
+			"item": [
+				{
+					"name": "Get All Expressions",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/expression",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expression"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Expressions from Config ID and Passphrase",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/expression/config_id/:config_id/passphrase/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expression",
+								"config_id",
+								":config_id",
+								"passphrase",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "config_id",
+									"value": "4"
+								},
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Expressions from Avatar ID",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/expression/avatar_id/:avatar_id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expression",
+								"avatar_id",
+								":avatar_id",
+								""
+							],
+							"variable": [
+								{
+									"key": "avatar_id",
+									"value": "{{avatar_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Certain Expression from Avatar ID",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/expression/avatar_id/:avatar_id/expression/:expression",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expression",
+								"avatar_id",
+								":avatar_id",
+								"expression",
+								":expression"
+							],
+							"variable": [
+								{
+									"key": "avatar_id",
+									"value": "{{avatar_id}}"
+								},
+								{
+									"key": "expression",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Expression Hyperlink from Avatar ID and Expression",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/1720430516877.mp4"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/expression/:avatar_id/:expression",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expression",
+								":avatar_id",
+								":expression"
+							],
+							"variable": [
+								{
+									"key": "avatar_id",
+									"value": "{{avatar_id}}"
+								},
+								{
+									"key": "expression",
+									"value": "{{expression}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Return Expression Based on Prompt",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"passphrase\": \"{{passphrase}}\",\n    // \"prompt\": \"Hi! How are you! I'm very happy to see you!\"\n    \"prompt\": \"Aww.. I am so sad..\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/expression/:avatar_id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"expression",
+								":avatar_id",
+								""
+							],
+							"variable": [
+								{
+									"key": "avatar_id",
+									"value": "{{avatar_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Text Expression",
+			"item": [
+				{
+					"name": "Get Text Expressions From Avatar ID",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/text-expression/:avatar_id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"text-expression",
+								":avatar_id"
+							],
+							"variable": [
+								{
+									"key": "avatar_id",
+									"value": "{{avatar_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Text Expressions From Prompt",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true,
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"prompt\": \"Hi! How are you!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/text-expression/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"text-expression",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Text Expressions From Config ID and Passphrase",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/text-expression/config_id/:config_id/passphrase/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"text-expression",
+								"config_id",
+								":config_id",
+								"passphrase",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "config_id",
+									"value": "4"
+								},
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Text Expression",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar_id",
+									"value": "{{avatar_id}}",
+									"type": "text"
+								},
+								{
+									"key": "prompt",
+									"value": "idle",
+									"type": "text"
+								},
+								{
+									"key": "video",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/1720077328642.mp4"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/text-expression/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"text-expression",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Text Expression by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar_id",
+									"value": "668ca97d282d8b5390949c1f",
+									"type": "text"
+								},
+								{
+									"key": "prompt",
+									"value": "Hi! How are you!",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "video",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/d-id(1).jpg",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/text-expression/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"text-expression",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{text_expression_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Text Expression by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/text-expression/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"text-expression",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{text_expression_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Media",
+			"item": [
+				{
+					"name": "Get All Media",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/media-vector/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"media-vector",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Media by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/media-vector/id/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"media-vector",
+								"id",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "66ab2e9b305a884710b538f0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Media by Passphrase",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/media-vector/passphrase/:passphrase",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"media-vector",
+								"passphrase",
+								":passphrase"
+							],
+							"variable": [
+								{
+									"key": "passphrase",
+									"value": "$2b$12$ts2fs5fyvWWUIWdIAl9jOu"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Media",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "description",
+									"value": "Dunia fashion terus berkembang dengan munculnya tren-tren baru setiap tahunnya. Di tahun 2022, beberapa tren fashion yang sedang populer adalah gaya minimalis, warna-warna pastel, dan penggunaan bahan ramah lingkungan.",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/Users/jxnhiro/Downloads/Poster Visi Misi UC.jpg"
+								},
+								{
+									"key": "passphrase",
+									"value": "{{passphrase}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/media-vector/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"media-vector",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Media",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\" : \"dunia fashion terus\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/media-vector/search",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"media-vector",
+								"search"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Fine Tune (OpenAI)",
+			"item": [
+				{
+					"name": "Fetch All Models Available to Fine Tune",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/models/available",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"models",
+								"available"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch All Fine Tuned Models",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/models/finetuned",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"models",
+								"finetuned"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch All Fine Tuning Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/files",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"files"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch All Fine Tuning Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/jobs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"jobs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fetch Specific Fine Tuning Job",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/job/:job_id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"job",
+								":job_id"
+							],
+							"variable": [
+								{
+									"key": "job_id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Fine Tuning File (.csv) to OpenAI",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/Users/jxnhiro/Documents/fxmedia-files/paris-finetuning.csv"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/file",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"file"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Start Fine Tuning Job",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"model\": \"gpt-3.5-turbo-0125\",\n    \"file_id\": \"file-4MIp8ujWCkc4nQxPNNwEFtbE\"\n    // \"batch_size\": ,\n    // \"learning_rate_multiplier\":,\n    // \"n_epochs\":,\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/fine-tune/tune",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"fine-tune",
+								"tune"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://dev-fxm-llm.fxwebapps.com",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NmIwNGYxYzU2NWIxMzRlMGNhNTJkOGMiLCJuYW1lIjoibW9uaWthIiwiZW1haWwiOiJtb25pa2FAZnhtd2ViLmNvbSIsInJvbGUiOiJBZG1pbmlzdHJhdG9yIiwiY29uZGl0aW9uIjoiQzEsQzIiLCJnZW5kZXIiOiJGZW1hbGUiLCJzdGF0dXMiOiJBY3RpdmUiLCJleHAiOjE3NTY4MDY3ODgsImlhdCI6MTcyNTI3MDc4OH0.3z07W1p2fb1oWvu4WDC7y6Op0Sw8EhCaLYEsDLj6LOw"
+		},
+		{
+			"key": "passphrase",
+			"value": "68uGPM49H6V2xWWJjM6kNk9flN7wBP0OKTdM",
+			"type": "string"
+		},
+		{
+			"key": "avatar_id",
+			"value": "66b4d4417ff3847dc771aca2",
+			"type": "string"
+		},
+		{
+			"key": "expression",
+			"value": "happy",
+			"type": "string"
+		},
+		{
+			"key": "text_expression_id",
+			"value": "66a365d268dd5cf6b2980e66"
+		},
+		{
+			"key": "config_id",
+			"value": "66b2fc1219bc4765b2675378",
+			"type": "string"
+		},
+		{
+			"key": "pdf_id",
+			"value": "66d9178219a0600467f7caa4",
+			"type": "string"
+		},
+		{
+			"key": "rag_app_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "general_app_id",
+			"value": "2",
+			"type": "string"
+		},
+		{
+			"key": "math_app_id",
+			"value": "3",
+			"type": "string"
+		},
+		{
+			"key": "microlearning_app_id",
+			"value": "4",
+			"type": "string"
+		}
+	]
+}
