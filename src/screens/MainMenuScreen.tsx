@@ -158,7 +158,7 @@ export function MainMenuScreen({ avatar, messages, onNavigate }: MainMenuScreenP
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
       >
-        <ChatLog messages={messages} />
+        <ChatLog messages={messages} isThinking={avatar.isThinking} />
       </motion.div>
 
     </div>

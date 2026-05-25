@@ -229,7 +229,7 @@ export function TopicDetailScreen({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
       >
-        <ChatLog messages={messages} />
+        <ChatLog messages={messages} isThinking={avatar.isThinking} />
       </motion.div>
 
       {/* Back button */}

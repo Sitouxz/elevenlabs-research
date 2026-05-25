@@ -127,7 +127,7 @@ export function EndScenarioScreen({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <ChatLog messages={displayMessages} />
+        <ChatLog messages={displayMessages} isThinking={avatar.isThinking} />
       </motion.div>
 
     </div>

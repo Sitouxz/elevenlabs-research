@@ -5,16 +5,17 @@ import type { AvatarMessage as AgentMessage } from "../hooks/useAkoolAvatar";
 interface ChatLogProps {
   messages: AgentMessage[];
   className?: string;
+  isThinking?: boolean;
 }
 
-export function ChatLog({ messages, className = "" }: ChatLogProps) {
+export function ChatLog({ messages, className = "", isThinking = false }: ChatLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isThinking]);
 
   const recent = messages.slice(-3);
 
@@ -107,7 +108,38 @@ export function ChatLog({ messages, className = "" }: ChatLogProps) {
               ))}
             </AnimatePresence>
 
-            {recent.length === 0 && (
+            <AnimatePresence>
+              {isThinking && (
+                <motion.div
+                  key="thinking"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-1"
+                  style={{ paddingTop: 2 }}
+                  aria-label="Lumi is thinking"
+                >
+                  {[0, 1, 2].map((i) => (
+                    <motion.span
+                      key={i}
+                      animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+                      transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+                      style={{
+                        display: "inline-block",
+                        width: "clamp(5px, 0.55vw, 7px)",
+                        height: "clamp(5px, 0.55vw, 7px)",
+                        borderRadius: "50%",
+                        background: "#7FE040",
+                        boxShadow: "0 0 6px rgba(127,224,64,0.6)",
+                      }}
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {recent.length === 0 && !isThinking && (
               <p
                 style={{
                   fontFamily: "'Open Sans', sans-serif",

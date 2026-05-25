@@ -141,11 +141,28 @@ function App() {
     if (action.screen === "topic-detail" && action.topic) {
       const canNavigateToTopic = screen === "main-menu" || screen === "topic-select" || screen === "topic-detail" || screen === "ask-questions";
       if (canNavigateToTopic) {
+        const isSameTopic = screen === "topic-detail" && activeTopic === action.topic;
         setActiveTopic(action.topic);
         setScreen("topic-detail");
+        // Ensure the AI introduces the topic. The user's natural transcript is
+        // already dispatched to FX via the avatar hook, but if the transcript
+        // was eaten by a TTS-cooldown gate or arrived via a non-dispatching
+        // path, we still want a topic intro. sendContextualUpdate is hidden
+        // (no chat-log entry) and FX in-flight queueing handles serialization.
+        if (!isSameTopic) {
+          const topicNames: Record<TopicId, string> = {
+            solar: "Solar Energy",
+            ev: "EV Charging",
+            battery: "Battery Storage",
+            ai: "AI in Energy",
+          };
+          avatar.sendContextualUpdate(
+            `User selected topic: ${topicNames[action.topic]}. Please give a brief engaging introduction (2-3 sentences) about ${topicNames[action.topic]} in the context of smart energy and Singapore's green city vision.`
+          );
+        }
       }
     }
-  }, [avatar.messages, parseIntent, screen]);
+  }, [avatar, avatar.messages, parseIntent, screen, activeTopic]);
 
   // Splash exits on click or any voice input (handled above)
 

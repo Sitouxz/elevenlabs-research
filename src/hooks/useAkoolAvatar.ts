@@ -27,6 +27,7 @@ export interface UseAkoolAvatarReturn {
   loadingStatus: string;
   isSpeaking: boolean;
   isListening: boolean;
+  isThinking: boolean;
   isConnected: boolean;
   messages: AvatarMessage[];
   /** Callback ref to attach to the video container div */
@@ -156,6 +157,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const [loadingStatus, setLoadingStatus] = useState("Connecting to avatar...");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState<AvatarMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,67 +239,138 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   const normalizeTranscript = useCallback((s: string) =>
     s.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.!?,;:]+$/g, ""), []);
 
-  // Append a user transcript to the chat log, deduping against the last few user
-  // messages (handles the case where browser STT, Akool ASR, and Akool's
-  // chat-from-user event all surface the same utterance with different casing).
+  // Ref-based recent-transcripts cache for dedupe. Independent of React state
+  // ordering — guarantees that if two paths (browser STT + Akool ASR + chat
+  // from-user, or duplicate fires from a single source) deliver the same
+  // utterance within the window, only the first wins. We also store a substring
+  // match so close variants ("tell me about solar" vs "tell me about solar.")
+  // collapse.
+  const recentUserTranscriptsRef = useRef<{ norm: string; at: number }[]>([]);
+
+  // Append a user transcript to the chat log, deduping against recently seen
+  // transcripts in BOTH the ref cache (primary) and the message list (backup).
   const appendUserMessage = useCallback((text: string): boolean => {
     const trimmed = text.trim();
     if (!trimmed) return false;
     const norm = normalizeTranscript(trimmed);
+    const now = Date.now();
+    const DEDUPE_WINDOW_MS = 12000;
+
+    // Garbage-collect old entries
+    recentUserTranscriptsRef.current = recentUserTranscriptsRef.current.filter(
+      (e) => now - e.at < DEDUPE_WINDOW_MS
+    );
+
+    // Primary dedupe: ref cache. Match exact, prefix, or substring containment.
+    for (const entry of recentUserTranscriptsRef.current) {
+      if (entry.norm === norm) return false;
+      if (norm.length > 6 && (entry.norm.includes(norm) || norm.includes(entry.norm))) return false;
+    }
+
+    // Record immediately so any synchronous follow-up call (different path,
+    // same utterance) sees this transcript before its setMessages runs.
+    recentUserTranscriptsRef.current.push({ norm, at: now });
+
     let appended = false;
     setMessages((prev) => {
-      // Check the last 3 messages for a normalized match within 8 seconds
-      const cutoff = Date.now() - 8000;
-      for (let i = prev.length - 1, checked = 0; i >= 0 && checked < 3; i--, checked++) {
+      // Backup dedupe: scan the last 5 user messages within the window.
+      const cutoff = now - DEDUPE_WINDOW_MS;
+      let userChecked = 0;
+      for (let i = prev.length - 1; i >= 0 && userChecked < 5; i--) {
         const m = prev[i];
         if (m.role !== "user") continue;
+        userChecked++;
         if (m.timestamp < cutoff) break;
-        if (normalizeTranscript(m.text) === norm) return prev;
+        const mNorm = normalizeTranscript(m.text);
+        if (mNorm === norm) return prev;
+        if (norm.length > 6 && (mNorm.includes(norm) || norm.includes(mNorm))) return prev;
       }
       appended = true;
-      return [...prev, { role: "user", text: trimmed, timestamp: Date.now() }];
+      return [...prev, { role: "user", text: trimmed, timestamp: now }];
     });
     return appended;
   }, [normalizeTranscript]);
-  const dispatchFxRef = useRef<(userText: string) => Promise<void>>(async () => {});
-  const dispatchFx = useCallback(async (userText: string) => {
+  const dispatchFxRef = useRef<(userText: string, opts?: { hidden?: boolean }) => Promise<void>>(async () => {});
+  const fxQueuedHiddenRef = useRef<boolean>(false);
+  const dispatchFx = useCallback(async (userText: string, opts?: { hidden?: boolean }) => {
     if (!FX_LLM_ENABLED) return;
+    const hidden = !!opts?.hidden;
     const trimmed = userText.trim();
     if (!trimmed) return;
     const norm = trimmed.toLowerCase().replace(/\s+/g, " ").replace(/[.!?,;:]+$/g, "");
     const now = Date.now();
     // Drop exact duplicate within 5s (multi-source dedup: browser STT + Akool ASR).
-    if (fxLastPromptRef.current === norm && now - fxLastDispatchAtRef.current < 5000) return;
+    // Skip dedupe for hidden (system-injected) prompts so click + voice both produce responses.
+    if (!hidden && fxLastPromptRef.current === norm && now - fxLastDispatchAtRef.current < 5000) {
+      console.log("[FX] dispatch skipped (dedupe):", trimmed.slice(0, 60));
+      return;
+    }
     // Serialize: if one is in flight, queue this prompt (replacing any previous queued).
     // This prevents concurrent speak() calls which cause Akool to drop one response.
     if (fxInFlightRef.current) {
+      console.log("[FX] dispatch queued (in-flight):", trimmed.slice(0, 60));
       fxQueuedPromptRef.current = trimmed;
+      fxQueuedHiddenRef.current = hidden;
       return;
     }
-    fxLastPromptRef.current = norm;
+    console.log("[FX] dispatch starting:", trimmed.slice(0, 60), hidden ? "(hidden)" : "");
+    if (!hidden) fxLastPromptRef.current = norm;
     fxLastDispatchAtRef.current = now;
     fxInFlightRef.current = true;
+    setIsThinking(true);
     try {
       const history = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS);
-      const res = await chatWithFx(trimmed, history);
-      fxHistoryRef.current.push({ user: trimmed });
-      fxHistoryRef.current.push({ ai: res.text });
-      if (fxHistoryRef.current.length > FX_HISTORY_MAX_TURNS * 2) {
-        fxHistoryRef.current = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS * 2);
+      // Retry once on transient failure / empty response before falling back.
+      let res: { text: string } | null = null;
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          res = await chatWithFx(trimmed, history);
+          if (res?.text?.trim()) break;
+          res = null;
+        } catch (err) {
+          lastErr = err;
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, 600));
+            continue;
+          }
+        }
       }
-      setMessages((prev) => [...prev, { role: "ai", text: res.text, timestamp: Date.now() }]);
-      recentBotTextsRef.current.push(res.text.toLowerCase());
-      if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
-      await speakRef.current(res.text);
+      if (!res) {
+        if (lastErr) console.error("[FX] dispatch failed after retry:", lastErr);
+        const fallback = "Sorry, I didn't catch that — could you say it again?";
+        setMessages((prev) => [...prev, { role: "ai", text: fallback, timestamp: Date.now() }]);
+        recentBotTextsRef.current.push(fallback.toLowerCase());
+        if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
+        setIsThinking(false);
+        await speakRef.current(fallback);
+      } else {
+        // Don't pollute history with hidden system prompts beyond the AI's reply,
+        // but still record the AI turn so future user prompts have context.
+        if (!hidden) fxHistoryRef.current.push({ user: trimmed });
+        fxHistoryRef.current.push({ ai: res.text });
+        if (fxHistoryRef.current.length > FX_HISTORY_MAX_TURNS * 2) {
+          fxHistoryRef.current = fxHistoryRef.current.slice(-FX_HISTORY_MAX_TURNS * 2);
+        }
+        setMessages((prev) => [...prev, { role: "ai", text: res!.text, timestamp: Date.now() }]);
+        recentBotTextsRef.current.push(res.text.toLowerCase());
+        if (recentBotTextsRef.current.length > 10) recentBotTextsRef.current.shift();
+        setIsThinking(false);
+        await speakRef.current(res.text);
+      }
     } catch (e) {
       console.error("[FX] dispatch failed:", e);
+      setIsThinking(false);
     } finally {
+      setIsThinking(false);
       fxInFlightRef.current = false;
       // Drain queue: replay the latest buffered prompt (if any) after current finishes.
       const queued = fxQueuedPromptRef.current;
+      const queuedHidden = fxQueuedHiddenRef.current;
       if (queued) {
         fxQueuedPromptRef.current = null;
-        dispatchFxRef.current(queued);
+        fxQueuedHiddenRef.current = false;
+        dispatchFxRef.current(queued, { hidden: queuedHidden });
       }
     }
   }, []);
@@ -1137,6 +1210,13 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   }, []);
 
   const sendContextualUpdate = useCallback((text: string) => {
+    if (FX_LLM_ENABLED) {
+      // In retelling mode Akool has no LLM brain — route system context through FX,
+      // which will produce a natural reply and have the avatar speak it.
+      // Use hidden:true so the synthetic prompt doesn't show in the chat log.
+      dispatchFxRef.current(text, { hidden: true });
+      return;
+    }
     const client = agoraClientRef.current;
     if (mode !== "streaming" || !client) return;
     // Send as a chat message (processed by the LLM) rather than TTS (spoken verbatim).
@@ -1145,7 +1225,7 @@ export function useAkoolAvatar(): UseAkoolAvatarReturn {
   }, [mode]);
 
   return {
-    mode, isReady, isVideoPlaying, videoTrackReady, loadingStatus, isConnected, isSpeaking, isListening, messages,
+    mode, isReady, isVideoPlaying, videoTrackReady, loadingStatus, isConnected, isSpeaking, isListening, isThinking, messages,
     videoRef, videoContainer, speak, stop, error, retryPlay, sendContextualUpdate,
     startListening, stopListening,
   };
