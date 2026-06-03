@@ -258,6 +258,14 @@ export const useVision = () => {
         }
     }, []);
 
+    // Analyze a single frame on demand (for manual triggering)
+    const analyzeOnce = useCallback(
+        async (video: HTMLVideoElement): Promise<VisionResult | null> => {
+            return await analyzeFrame(video);
+        },
+        [analyzeFrame]
+    );
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -273,5 +281,6 @@ export const useVision = () => {
         analyzeFrame,
         startAnalysisLoop,
         stopAnalysisLoop,
+        analyzeOnce,
     };
 };

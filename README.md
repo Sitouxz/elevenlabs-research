@@ -72,6 +72,17 @@ For **voice triggers** to work, register two client tools on your agent at https
 | Wait for response | ✅ ON (timeout 5s) |
 | Parameter | `prompt` (string, required) — `A detailed description of the video to generate, including subject, action, camera movement, and style.` |
 
+**Tool 3 — `scan_camera`**
+
+| Field | Value |
+| --- | --- |
+| Name | `scan_camera` |
+| Description | `Scan the user's live camera and describe what it currently sees. Call this whenever the user asks what's on their screen, what you can see, or to look at something in front of them. Always call the tool — never claim you lack camera access.` |
+| Wait for response | ✅ ON (timeout 10s) |
+| Parameters | none |
+
+This tool takes no parameters — it captures the current camera frame, runs it through the vision model, and returns the description for the agent to read back. The camera must be turned on (via the on-screen control) for the scan to succeed.
+
 The manual prompt input works without this configuration.
 
 ## Production deployment

@@ -16,8 +16,9 @@ const AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "PASTE_YOUR_AGENT_I
 function App() {
   const camera = useCamera();
   const vision = useVision();
-  const visionUpdateRef = useRef<((text: string) => void) | null>(null);
+  // visionUpdateRef no longer needed for on-demand vision
   const isSpeakingRef = useRef(false);
+  const processedMsgCountRef = useRef(0);
   const [hasSentFirstScan, setHasSentFirstScan] = useState(false);
 
   const {
@@ -45,6 +46,11 @@ function App() {
     generateRef.current = imageGen.generate;
   }, [imageGen.generate]);
 
+
+  const visionRef = useRef(vision);
+  useEffect(() => {
+    visionRef.current = vision;
+  }, [vision]);
   useEffect(() => {
     registerClientTools({
       generate_image: ({ prompt }) => {
@@ -65,63 +71,56 @@ function App() {
         generateRef.current(promptStr, "video");
         return `Rendering a video of ${promptStr}. This usually takes 30 to 60 seconds — it will appear on screen when ready.`;
       },
+      scan_camera: async () => {
+        console.log("[JARVIS tool] scan_camera invoked");
+        if (!camera.isCameraOn) {
+          return "The camera is currently off. Ask the user to turn on the camera first, then try again.";
+        }
+        if (!camera.videoRef.current) {
+          return "Camera not available right now.";
+        }
+        const result = await visionRef.current.analyzeOnce(camera.videoRef.current);
+        if (!result) {
+          return "I couldn't scan the camera frame. Please try again.";
+        }
+        return `Here is what the camera sees right now: ${result.description}`;
+      },
     });
     console.log(
-      "[JARVIS] Client tools registered: generate_image, generate_video. " +
-      "NOTE: For voice triggers to work, both tools must ALSO be declared " +
+      "[JARVIS] Client tools registered: generate_image, generate_video, scan_camera. " +
+      "NOTE: For voice triggers to work, all tools must ALSO be declared " +
       "on the agent dashboard. See README for instructions."
     );
-  }, [registerClientTools]);
+  }, [registerClientTools, camera]);
 
   // Keep isSpeakingRef in sync for use inside callbacks
   useEffect(() => {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
-  // Only enable sending to ElevenLabs after the first scan has been delivered
-  useEffect(() => {
-    visionUpdateRef.current =
-      isConnected && hasSentFirstScan ? sendContextualUpdate : null;
-  }, [sendContextualUpdate, isConnected, hasSentFirstScan]);
-
   // Reset first-scan flag when disconnected
   useEffect(() => {
-    if (!isConnected) setHasSentFirstScan(false);
+    if (!isConnected) {
+      setHasSentFirstScan(false);
+      processedMsgCountRef.current = 0;
+    }
   }, [isConnected]);
 
-  // Start vision analysis as soon as camera is on — independent of ElevenLabs
+  // Send system prompt about vision capability when connected. Vision is
+  // triggered by the agent calling the scan_camera client tool (declared on
+  // the ElevenLabs dashboard) whenever the user asks about the camera/screen.
   useEffect(() => {
-    if (camera.isCameraOn && vision.isReady) {
-      vision.startAnalysisLoop(
-        () => camera.videoRef.current,
-        (description) => {
-          // Don't send while JARVIS is speaking — avoid interrupting mid-sentence
-          if (isSpeakingRef.current) return;
-          if (visionUpdateRef.current) {
-            visionUpdateRef.current(`[VISION UPDATE] ${description}`);
-          }
-        },
-        10000
-      );
-    } else {
-      vision.stopAnalysisLoop();
-    }
-    return () => vision.stopAnalysisLoop();
-  }, [camera.isCameraOn, vision.isReady]);
-
-  // Once connected AND first scan result is ready, send system prompt + scan together
-  useEffect(() => {
-    if (isConnected && vision.lastResult && !hasSentFirstScan) {
+    if (isConnected && !hasSentFirstScan) {
       sendContextualUpdate(
-        `[SYSTEM] You have real-time camera vision. ` +
-        `You will receive [VISION UPDATE] messages describing what the camera sees. ` +
-        `Naturally talk about what you see. Do NOT narrate every update.\n\n` +
-        `[VISION UPDATE] ${vision.lastResult.description}`
+        `[SYSTEM] You have live camera vision. You CAN see through the user's camera. ` +
+        `Whenever the user asks what's on their screen, what you can see, or to look at ` +
+        `something, call the scan_camera tool to capture and read the current frame, then ` +
+        `answer from its result. Never say you don't have access to the camera.`
       );
       setHasSentFirstScan(true);
-      console.log("First vision scan sent to JARVIS.");
+      console.log("Vision capability notification sent to JARVIS.");
     }
-  }, [isConnected, vision.lastResult, hasSentFirstScan, sendContextualUpdate]);
+  }, [isConnected, hasSentFirstScan, sendContextualUpdate]);
 
   const handleToggleCamera = useCallback(async () => {
     await camera.toggleCamera();
