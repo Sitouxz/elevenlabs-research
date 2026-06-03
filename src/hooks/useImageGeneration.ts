@@ -4,20 +4,24 @@ import { useState, useCallback, useRef, useEffect } from "react";
 // Replicate media (image + video) generation hook
 //
 // Architecture:
-//   browser -> /api/replicate/* (Vite dev proxy) -> https://api.replicate.com/v1/*
-//   The proxy injects the Authorization: Bearer header so the Replicate token
-//   never reaches the client bundle (see vite.config.ts).
+//   browser -> n8n webhook -> https://api.replicate.com/v1/*
+//   n8n acts as a proxy to handle CORS and inject the API token.
+//   The webhook waits for the result and returns it directly in the response.
 //
-// Endpoint pattern used (works for any owner/model on Replicate):
-//   POST /api/replicate/models/{owner}/{model}/predictions
-//   GET  /api/replicate/predictions/{id}
-//
-// We send the `Prefer: wait=60` header on the initial POST so fast models
-// (e.g. flux-schnell) return the finished prediction in a single round trip.
-// Slower models (especially video) fall back to short-interval polling.
+// Endpoint pattern:
+//   POST {N8N_IMAGE_WEBHOOK} - creates image prediction and waits for result
+//   POST {N8N_VIDEO_WEBHOOK} - creates video prediction and waits for result
 // ---------------------------------------------------------------------------
 
 export type MediaType = "image" | "video";
+
+const N8N_IMAGE_WEBHOOK = import.meta.env.VITE_N8N_IMAGE_WEBHOOK || "https://fxaitools.app.n8n.cloud/webhook/generate-image-jarvis";
+const N8N_VIDEO_WEBHOOK = import.meta.env.VITE_N8N_VIDEO_WEBHOOK || "https://fxaitools.app.n8n.cloud/webhook/generate-video-jarvis";
+
+const WEBHOOK_BY_TYPE: Record<MediaType, string> = {
+    image: N8N_IMAGE_WEBHOOK,
+    video: N8N_VIDEO_WEBHOOK,
+};
 
 const IMAGE_MODEL =
     import.meta.env.VITE_REPLICATE_MODEL || "black-forest-labs/flux-schnell";
@@ -30,13 +34,13 @@ const MODEL_BY_TYPE: Record<MediaType, string> = {
     video: VIDEO_MODEL,
 };
 
-const POLL_INTERVAL_MS = 800;
+// const POLL_INTERVAL_MS = 800;
 // Image generations should complete in <90s. Video models routinely take
 // 1-2 minutes, sometimes more for higher-quality models.
-const MAX_POLL_MS_BY_TYPE: Record<MediaType, number> = {
-    image: 90_000,
-    video: 300_000,
-};
+// const MAX_POLL_MS_BY_TYPE: Record<MediaType, number> = {
+//     image: 90_000,
+//     video: 300_000,
+// };
 
 const WINDOW_WIDTH = 512;
 const WINDOW_HEIGHT = 600; // body 512 + header/footer ~88
@@ -117,67 +121,6 @@ export const useImageGeneration = () => {
         []
     );
 
-    // -----------------------------------------------------------------------
-    // Internal: poll a prediction until it terminates
-    // -----------------------------------------------------------------------
-    const pollPrediction = useCallback(
-        (
-            windowId: string,
-            predictionId: string,
-            startedAt: number,
-            mediaType: MediaType
-        ) => {
-            const maxPollMs = MAX_POLL_MS_BY_TYPE[mediaType];
-            const tick = async () => {
-                if (Date.now() - startedAt > maxPollMs) {
-                    patchWindow(windowId, {
-                        status: "failed",
-                        error: `Timed out after ${Math.round(maxPollMs / 1000)}s`,
-                    });
-                    activePollsRef.current.delete(windowId);
-                    return;
-                }
-
-                try {
-                    const res = await fetch(
-                        `/api/replicate/predictions/${predictionId}`
-                    );
-                    if (!res.ok) {
-                        patchWindow(windowId, {
-                            status: "failed",
-                            error: `Poll error ${res.status}`,
-                        });
-                        activePollsRef.current.delete(windowId);
-                        return;
-                    }
-                    const data = await res.json();
-                    handlePredictionResult(windowId, data);
-                    if (
-                        data.status === "starting" ||
-                        data.status === "processing"
-                    ) {
-                        const handle = window.setTimeout(
-                            tick,
-                            POLL_INTERVAL_MS
-                        );
-                        activePollsRef.current.set(windowId, handle);
-                    } else {
-                        activePollsRef.current.delete(windowId);
-                    }
-                } catch (err: any) {
-                    patchWindow(windowId, {
-                        status: "failed",
-                        error: err?.message || "Network error while polling",
-                    });
-                    activePollsRef.current.delete(windowId);
-                }
-            };
-
-            const handle = window.setTimeout(tick, POLL_INTERVAL_MS);
-            activePollsRef.current.set(windowId, handle);
-        },
-        [patchWindow]
-    );
 
     // -----------------------------------------------------------------------
     // Internal: extract URL + push to history when a prediction terminates
@@ -270,23 +213,20 @@ export const useImageGeneration = () => {
             setError("");
 
             const { owner, name } = parseModel(MODEL_BY_TYPE[mediaType]);
-            const startedAt = Date.now();
+            const webhookUrl = WEBHOOK_BY_TYPE[mediaType];
 
             (async () => {
                 try {
                     const res = await fetch(
-                        `/api/replicate/models/${owner}/${name}/predictions`,
+                        webhookUrl,
                         {
                             method: "POST",
                             headers: {
                                 "Content-Type": "application/json",
-                                // Block up to 60s on the initial POST so fast
-                                // models return without us needing to poll.
-                                // Video models almost always exceed 60s, so
-                                // they fall through to polling.
-                                Prefer: "wait=60",
                             },
                             body: JSON.stringify({
+                                owner,
+                                model: name,
                                 input: { prompt: trimmed },
                             }),
                         }
@@ -305,42 +245,25 @@ export const useImageGeneration = () => {
                             status: "failed",
                             error: `${res.status}: ${parsed}`.slice(0, 240),
                         });
-                        setError(`Replicate ${res.status}`);
+                        setError(`Generation ${res.status}`);
                         return;
                     }
 
                     const data = await res.json();
-                    patchWindow(id, { predictionId: data?.id });
                     handlePredictionResult(id, data);
-
-                    // If the model didn't finish during the wait window,
-                    // start polling.
-                    if (
-                        data?.status === "starting" ||
-                        data?.status === "processing"
-                    ) {
-                        if (data?.id) {
-                            pollPrediction(id, data.id, startedAt, mediaType);
-                        } else {
-                            patchWindow(id, {
-                                status: "failed",
-                                error: "Missing prediction id",
-                            });
-                        }
-                    }
                 } catch (err: any) {
                     patchWindow(id, {
                         status: "failed",
                         error:
                             err?.message ||
-                            "Network error contacting Replicate",
+                            "Network error contacting generation service",
                     });
                 }
             })();
 
             return id;
         },
-        [handlePredictionResult, patchWindow, pollPrediction]
+        [handlePredictionResult, patchWindow]
     );
 
     // -----------------------------------------------------------------------
