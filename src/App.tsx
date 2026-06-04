@@ -272,6 +272,11 @@ function App() {
           onPositionChange={imageGen.updateWindowPosition}
         />
       </div>
+
+      {/* Version badge */}
+      <div className="fixed bottom-2 right-3 z-50 font-mono text-[10px] text-primary/30 select-none pointer-events-none tracking-widest">
+        v{__APP_VERSION__}
+      </div>
     </div>
   );
 }
