@@ -3,8 +3,11 @@ import { motion } from "framer-motion";
 
 interface ControlsProps {
     isConnected: boolean;
+    isConnecting?: boolean;
     isMuted: boolean;
     isCameraOn: boolean;
+    visible?: boolean;
+    interruptEnabled: boolean;
     onStart: () => void;
     onEnd: () => void;
     onToggleMute: () => void;
@@ -14,25 +17,31 @@ interface ControlsProps {
 
 export const Controls = ({
     isConnected,
+    isConnecting = false,
     isMuted,
     isCameraOn,
+    visible = true,
+    interruptEnabled,
     onStart,
     onEnd,
     onToggleMute,
     onInterrupt,
     onToggleCamera
 }: ControlsProps) => {
+    if (!visible) return null;
+
     return (
         <div className="glass-panel px-4 py-3 sm:px-8 sm:py-4 rounded-2xl neon-border flex items-center space-x-4 sm:space-x-8 transform transition-transform hover:-translate-y-1 duration-300">
             {/* Mute/Start Button */}
             <button
-                onClick={!isConnected ? onStart : onToggleMute}
-                className="group flex flex-col items-center gap-1 focus:outline-none"
+                onClick={!isConnected ? (isConnecting ? undefined : onStart) : onToggleMute}
+                disabled={!isConnected && isConnecting}
+                className={`group flex flex-col items-center gap-1 focus:outline-none ${!isConnected && isConnecting ? "opacity-60 cursor-not-allowed" : ""}`}
             >
                 <motion.div
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-[0_0_10px_rgba(0,238,255,0.1)] 
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-[0_0_10px_rgba(0,238,255,0.1)]
                 ${!isConnected
                             ? "bg-primary text-background-dark shadow-[0_0_20px_rgba(0,238,255,0.6)]"
                             : isMuted
@@ -42,12 +51,12 @@ export const Controls = ({
                     {isConnected ? (isMuted ? <MicOff size={20} /> : <Mic size={20} />) : <Mic size={24} className="animate-pulse" />}
                 </motion.div>
                 <span className={`text-[10px] font-mono tracking-wider uppercase ${isMuted ? "text-red-500" : "text-primary/50 group-hover:text-primary"}`}>
-                    {!isConnected ? "Start" : (isMuted ? "Unmute" : "Mute")}
+                    {!isConnected ? (isConnecting ? "Connecting..." : "Start") : (isMuted ? "Unmute" : "Mute")}
                 </span>
             </button>
 
             {/* Interrupt Button */}
-            {isConnected && (
+            {isConnected && interruptEnabled && (
                 <button
                     onClick={onInterrupt}
                     className="group flex flex-col items-center gap-1 focus:outline-none"
@@ -59,7 +68,7 @@ export const Controls = ({
                     >
                         <Hand size={28} />
                     </motion.div>
-                    <span className="text-[10px] font-mono text-primary tracking-wider uppercase font-bold">Interrupt</span>
+                    <span className="text-[10px] font-mono text-primary tracking-wider uppercase font-extrabold">Interrupt</span>
                 </button>
             )}
 

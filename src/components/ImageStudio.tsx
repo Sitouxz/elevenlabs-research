@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useCallback, useState, type KeyboardEvent } from "react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import {
     Sparkles,
     Send,
@@ -8,6 +8,8 @@ import {
     History,
     Trash2,
     Play,
+    Pencil,
+    X,
 } from "lucide-react";
 import type {
     ImageHistoryItem,
@@ -19,7 +21,12 @@ interface ImageStudioProps {
     activeCount: number;
     imageModel: string;
     videoModel: string;
-    onGenerate: (prompt: string, mediaType: MediaType) => void;
+    visible?: boolean;
+    onGenerate: (
+        prompt: string,
+        mediaType: MediaType,
+        referenceImage?: string,
+    ) => void;
     onReopen: (item: ImageHistoryItem) => void;
     onClearHistory: () => void;
 }
@@ -29,20 +36,53 @@ export const ImageStudio = ({
     activeCount,
     imageModel,
     videoModel,
+    visible = true,
     onGenerate,
     onReopen,
     onClearHistory,
 }: ImageStudioProps) => {
+    if (!visible) return null;
     const [prompt, setPrompt] = useState("");
     const [isExpanded, setIsExpanded] = useState(true);
     const [mediaType, setMediaType] = useState<MediaType>("image");
 
+    // When the user clicks "edit" on a history thumbnail, we remember the
+    // previous image URL so it can be sent as a style reference.
+    const [editingFrom, setEditingFrom] = useState<{
+        url: string;
+        label: string;
+    } | null>(null);
+    const promptRef = useRef<HTMLTextAreaElement>(null);
+
     const submit = useCallback(() => {
         const trimmed = prompt.trim();
         if (!trimmed) return;
-        onGenerate(trimmed, mediaType);
+        onGenerate(trimmed, mediaType, editingFrom?.url);
         setPrompt("");
-    }, [prompt, mediaType, onGenerate]);
+        setEditingFrom(null);
+    }, [prompt, mediaType, editingFrom, onGenerate]);
+
+    const startEditFromHistory = useCallback(
+        (item: ImageHistoryItem) => {
+            setMediaType(item.mediaType);
+            setPrompt("");
+            setEditingFrom({
+                url: item.imageUrl,
+                label:
+                    item.prompt.length > 40
+                        ? item.prompt.slice(0, 40) + "…"
+                        : item.prompt,
+            });
+            // Focus the prompt textarea so the user can type immediately
+            setTimeout(() => promptRef.current?.focus(), 50);
+        },
+        [],
+    );
+
+    const cancelEdit = useCallback(() => {
+        setEditingFrom(null);
+        setPrompt("");
+    }, []);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         // Enter submits, Shift+Enter inserts a newline
@@ -73,7 +113,7 @@ export const ImageStudio = ({
                         size={14}
                         className="text-primary animate-pulse"
                     />
-                    <h2 className="text-xs font-mono font-bold tracking-widest text-primary/80">
+                    <h2 className="text-xs font-mono font-extrabold tracking-widest text-primary/80">
                         MEDIA STUDIO
                     </h2>
                     {activeCount > 0 && (
@@ -132,6 +172,7 @@ export const ImageStudio = ({
 
                             <div className="relative">
                                 <textarea
+                                    ref={promptRef}
                                     value={prompt}
                                     onChange={(e) =>
                                         setPrompt(e.target.value)
@@ -143,12 +184,33 @@ export const ImageStudio = ({
                                             : "Describe an image to generate…"
                                     }
                                     rows={3}
-                                    className="w-full bg-background-dark/60 border border-primary/20 focus:border-primary/60 focus:shadow-[0_0_15px_rgba(0,238,255,0.2)] rounded-lg px-3 py-2 text-sm text-gray-100 font-light placeholder-primary/30 resize-none outline-none transition-all"
+                                    className="w-full bg-background-dark/60 border border-primary/20 focus:border-primary/60 focus:shadow-[0_0_15px_rgba(0,238,255,0.2)] rounded-lg px-3 py-2 text-sm text-gray-50 font-normal placeholder-primary/30 resize-none outline-none transition-all"
                                 />
                                 <div className="absolute bottom-2 right-2 text-[8px] font-mono text-primary/30 pointer-events-none">
                                     ⏎ to send
                                 </div>
                             </div>
+
+                            {/* Editing-from-history indicator */}
+                            {editingFrom && (
+                                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/10 border border-primary/30">
+                                    <Pencil
+                                        size={10}
+                                        className="text-primary flex-shrink-0"
+                                    />
+                                    <span className="text-[10px] font-mono text-primary/70 truncate flex-1">
+                                        Editing from: {editingFrom.label}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={cancelEdit}
+                                        className="text-primary/40 hover:text-primary flex-shrink-0 transition-colors"
+                                        title="Clear reference"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                            )}
 
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -264,6 +326,20 @@ export const ImageStudio = ({
                                                     </div>
                                                 )}
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+                                                {/* Edit-from-history button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        startEditFromHistory(
+                                                            item,
+                                                        );
+                                                    }}
+                                                    title="Use as reference for a new generation"
+                                                    className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-background-dark/80 border border-primary/30 text-primary/60 hover:text-primary hover:border-primary opacity-0 group-hover/thumb:opacity-100 transition-all"
+                                                >
+                                                    <Pencil size={9} />
+                                                </button>
                                             </motion.button>
                                         );
                                     })}

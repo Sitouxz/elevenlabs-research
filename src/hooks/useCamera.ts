@@ -10,9 +10,10 @@ export const useCamera = () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
+                    width: { min: 1280, ideal: 4096, max: 4096 },
+                    height: { min: 720, ideal: 2160, max: 2160 },
                     facingMode: "user",
+                    frameRate: { ideal: 30 },
                 },
             });
             setCameraStream(stream);

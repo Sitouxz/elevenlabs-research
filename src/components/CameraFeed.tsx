@@ -22,6 +22,7 @@ interface CameraFeedProps {
     lastResult: VisionResult | null;
     error: string;
     videoRef: React.RefObject<HTMLVideoElement | null>;
+    visible?: boolean;
     onToggleCamera: () => void;
 }
 
@@ -50,12 +51,15 @@ export const CameraFeed = ({
     lastResult,
     error,
     videoRef,
+    visible = true,
     onToggleCamera,
 }: CameraFeedProps) => {
     const dragControls = useDragControls();
     const [pos, setPos] = useState(computeInitialPosition);
     const startPosRef = useRef(pos);
     const [zIndex, setZIndex] = useState(30);
+
+    if (!visible) return null;
 
     const handleDragStart = () => {
         startPosRef.current = pos;
@@ -191,7 +195,7 @@ export const CameraFeed = ({
                 {/* Gemini badge */}
                 {isCameraOn && (
                     <div className="absolute top-2 right-2 bg-primary/20 border border-primary/40 rounded-full px-2 py-0.5">
-                        <span className="text-[9px] font-mono text-primary font-bold">
+                        <span className="text-[9px] font-mono text-primary font-extrabold">
                             {isAnalyzing ? "ANALYZING..." : "GEMINI"}
                         </span>
                     </div>
@@ -201,7 +205,7 @@ export const CameraFeed = ({
             {/* Description from Gemini */}
             {isCameraOn && lastResult && (
                 <div className="px-3 py-2 border-t border-primary/10 max-h-24 overflow-y-auto scrollbar-hide">
-                    <p className="text-[10px] font-mono text-gray-400 leading-relaxed">
+                    <p className="text-[10px] font-mono text-gray-300 leading-relaxed">
                         {lastResult.description}
                     </p>
                     <span className="text-[8px] font-mono text-primary/30 mt-1 block">

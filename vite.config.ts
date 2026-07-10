@@ -8,7 +8,7 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: st
 // https://vite.dev/config/
 export default defineConfig(() => {
   return {
-    base: '/jarvis/',
+    base: '/jarvis-test/',
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
     },

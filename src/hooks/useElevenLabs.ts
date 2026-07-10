@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Conversation } from "@elevenlabs/client";
 
 // Type signature for client-tool handlers registered with the agent.
@@ -12,6 +12,7 @@ export type ClientToolMap = Record<string, ClientToolHandler>;
 
 export const useElevenLabs = (agentId: string) => {
     const [isConnected, setIsConnected] = useState(false);
+    const [isConnecting, setIsConnecting] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
@@ -20,7 +21,21 @@ export const useElevenLabs = (agentId: string) => {
 
     const conversationRef = useRef<Conversation | null>(null);
     const isConnectedRef = useRef(false);
+    // Guards against a second startConversation() firing while the first
+    // is still connecting (e.g. user tabs away mid-connect, comes back to
+    // a UI that still shows "Start" since isConnected hasn't flipped yet,
+    // and clicks/presses Start again) — without this, two live sessions
+    // open and the agent greets twice.
+    const isConnectingRef = useRef(false);
+    const isMutedRef = useRef(false);
     const streamRef = useRef<MediaStream | null>(null);
+    // Separate from isMuted/isMutedRef: silences the SDK's outgoing mic audio
+    // without touching UI-facing mute state or disabling the local stream
+    // track, so the mute button/visualizer never show the mic as "off" while
+    // this is active. Used to make the agent effectively non-interruptible
+    // (no audio reaches the server to trigger a barge-in) without surfacing
+    // an auto-mute to the user.
+    const gateMutedRef = useRef(false);
 
     // Client tools registered before startConversation() — read at session
     // start so the agent can invoke them. Stored in a ref so updates from the
@@ -31,42 +46,81 @@ export const useElevenLabs = (agentId: string) => {
         clientToolsRef.current = { ...clientToolsRef.current, ...tools };
     }, []);
 
-    const toggleMute = useCallback(() => {
-        const newMuted = !isMuted;
+    const applyMuteState = useCallback(
+        (muted: boolean) => {
+            if (conversationRef.current) {
+                try {
+                    // Combine with the gate mute so a resolved gate never
+                    // accidentally unmutes audio the user explicitly muted.
+                    conversationRef.current.setMicMuted(muted || gateMutedRef.current);
+                } catch (err) {
+                    console.error("Failed to set SDK mic mute:", err);
+                }
+            }
 
-        // The ElevenLabs SDK captures its OWN internal microphone stream when
-        // Conversation.startSession() runs — it does NOT use the `stream`
-        // captured by this hook (that stream only feeds the local visualizer).
-        // So muting must go through the SDK's setMicMuted API; toggling
-        // track.enabled on the local stream alone leaves the agent still
-        // hearing the user.
+            // Also gate the visualizer's stream so the UI reflects the muted state.
+            if (streamRef.current) {
+                streamRef.current.getAudioTracks().forEach((track) => {
+                    track.enabled = !muted;
+                });
+            }
+
+            isMutedRef.current = muted;
+            setIsMuted(muted);
+        },
+        []
+    );
+
+    /**
+     * Silences outgoing mic audio at the SDK level without touching isMuted
+     * state or the stream track — used to prevent the agent from being
+     * interrupted while it's speaking, without showing the mic as muted.
+     */
+    const setGateMuted = useCallback((muted: boolean) => {
+        gateMutedRef.current = muted;
         if (conversationRef.current) {
             try {
-                conversationRef.current.setMicMuted(newMuted);
+                conversationRef.current.setMicMuted(muted || isMutedRef.current);
             } catch (err) {
-                console.error("Failed to toggle SDK mic mute:", err);
+                console.error("Failed to set SDK mic mute (gate):", err);
             }
         }
+    }, []);
 
-        // Also gate the visualizer's stream so the UI reflects the muted state.
-        if (stream) {
-            stream.getAudioTracks().forEach((track) => {
-                track.enabled = !newMuted;
-            });
+    const toggleMute = useCallback(() => {
+        applyMuteState(!isMuted);
+    }, [isMuted, applyMuteState]);
+
+    /** Mute the microphone unconditionally (no-op if already muted). */
+    const muteMic = useCallback(() => {
+        if (!isMutedRef.current) {
+            applyMuteState(true);
         }
+    }, [applyMuteState]);
 
-        setIsMuted(newMuted);
-    }, [isMuted, stream]);
+    /** Unmute the microphone unconditionally (no-op if already unmuted). */
+    const unmuteMic = useCallback(() => {
+        if (isMutedRef.current) {
+            applyMuteState(false);
+        }
+    }, [applyMuteState]);
 
     const interrupt = useCallback(async () => {
-        if (!conversationRef.current) return;
+        const conversation = conversationRef.current;
+        if (!conversation) return;
         try {
-            // In the current SDK, manual interruption can be achieved by sending a stop signal
-            // or just by the user speaking. If we want a button to force it:
-            // @ts-ignore
-            if (conversationRef.current.interrupt) {
-                // @ts-ignore
-                await conversationRef.current.interrupt();
+            // The SDK has no public "force interrupt" API — real interruptions
+            // are server-driven (VAD detects the user talking over the agent),
+            // and the client reacts internally via VoiceConversation's
+            // fadeOutAudio(), which fades out queued audio and flips the mode
+            // back to "listening". That method exists on the live instance at
+            // runtime even though it's marked private in the SDK's types, so
+            // call it directly to replicate a real interruption.
+            const fadeOutAudio = (
+                conversation as unknown as { fadeOutAudio?: () => void }
+            ).fadeOutAudio;
+            if (typeof fadeOutAudio === "function") {
+                fadeOutAudio.call(conversation);
             }
         } catch (error) {
             console.error("Failed to interrupt:", error);
@@ -74,6 +128,10 @@ export const useElevenLabs = (agentId: string) => {
     }, []);
 
     const startConversation = useCallback(async () => {
+        if (isConnectingRef.current || isConnectedRef.current) return;
+        isConnectingRef.current = true;
+        setIsConnecting(true);
+        gateMutedRef.current = false;
         try {
             // Optimize microphone constraints for lower latency
             const micStream = await navigator.mediaDevices.getUserMedia({
@@ -168,6 +226,9 @@ export const useElevenLabs = (agentId: string) => {
             console.log("ElevenLabs session started, id:", conversation.getId());
         } catch (error) {
             console.error("Failed to start conversation:", error);
+        } finally {
+            isConnectingRef.current = false;
+            setIsConnecting(false);
         }
     }, [agentId]);
 
@@ -204,16 +265,37 @@ export const useElevenLabs = (agentId: string) => {
         }
     }, []);
 
+    // Send a user-activity heartbeat every 30 seconds while connected so the
+    // ElevenLabs server-side inactivity timer never fires during silence.
+    useEffect(() => {
+        if (!isConnected) return;
+        const id = window.setInterval(() => {
+            if (isConnectedRef.current && conversationRef.current) {
+                try {
+                    conversationRef.current.sendUserActivity();
+                } catch {
+                    // ignore if session is closing
+                }
+            }
+        }, 30_000);
+        return () => window.clearInterval(id);
+    }, [isConnected]);
+
     return {
         isConnected,
+        isConnecting,
         isSpeaking,
         isListening,
         isMuted,
+        isMutedRef,
         messages,
         stream,
         startConversation,
         endConversation,
         toggleMute,
+        muteMic,
+        unmuteMic,
+        setGateMuted,
         interrupt,
         sendContextualUpdate,
         registerClientTools,

@@ -14,9 +14,10 @@ interface Message {
 
 interface TranscriptProps {
     messages: Message[];
+    visible?: boolean;
 }
 
-export const Transcript = ({ messages }: TranscriptProps) => {
+export const Transcript = ({ messages, visible = true }: TranscriptProps) => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -25,8 +26,10 @@ export const Transcript = ({ messages }: TranscriptProps) => {
         }
     }, [messages]);
 
+    if (!visible) return null;
+
     return (
-        <div className="glass-panel w-full rounded-tl-xl rounded-tr-xl md:rounded-xl p-4 md:p-5 relative overflow-hidden flex flex-col min-h-[150px] md:min-h-[250px] border-b-0 md:border-b">
+        <div className="glass-panel w-80 md:w-96 rounded-tl-xl rounded-tr-xl md:rounded-xl p-4 md:p-5 relative overflow-hidden flex flex-col min-h-[150px] md:min-h-[250px] border-b-0 md:border-b">
             {/* Fade out gradient at top */}
             <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background-dark/90 to-transparent z-10 pointer-events-none" />
 
@@ -40,7 +43,7 @@ export const Transcript = ({ messages }: TranscriptProps) => {
             {/* Messages */}
             <div
                 ref={scrollRef}
-                className="space-y-4 relative z-0 mt-8 overflow-y-auto max-h-[120px] md:max-h-[200px] scrollbar-hide flex-grow pb-4"
+                className="space-y-4 relative z-0 mt-8 overflow-y-auto max-h-[120px] md:max-h-[200px] custom-scrollbar flex-grow pb-4"
             >
                 <AnimatePresence>
                     {messages.length === 0 && (
@@ -51,9 +54,9 @@ export const Transcript = ({ messages }: TranscriptProps) => {
                         >
                             <div className="flex items-center gap-2 mb-1">
                                 <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
-                                <span className="text-[10px] font-mono text-primary/70 uppercase">Jarvis</span>
+                                <span className="text-[10px] font-mono text-primary/70 uppercase">FLARE</span>
                             </div>
-                            <p className="text-sm text-gray-300 font-light leading-relaxed pl-3.5 border-l border-primary/10">
+                            <p className="text-sm text-gray-200 font-normal leading-relaxed pl-3.5 border-l border-primary/10">
                                 System initialized. I am ready to process your request.
                             </p>
                         </motion.div>
@@ -79,16 +82,16 @@ export const Transcript = ({ messages }: TranscriptProps) => {
                                     "text-[10px] font-mono uppercase",
                                     msg.role === "ai" ? "text-primary" : "text-white"
                                 )}>
-                                    {msg.role === "ai" ? "Jarvis" : "You"}
+                                    {msg.role === "ai" ? "Flare" : "You"}
                                 </span>
                             </div>
                             <p
                                 className={cn(
-                                    "text-sm font-light leading-relaxed px-3.5",
+                                    "text-sm font-normal leading-relaxed px-3.5 whitespace-pre-wrap",
                                     msg.role === "ai"
-                                        ? "text-gray-100 border-l border-primary/20 ml-0.5"
+                                        ? "text-gray-50 border-l border-primary/20 ml-0.5"
                                         : "text-white border-r border-white/20 text-right mr-0.5",
-                                    i === messages.length - 1 && msg.role === "ai" && "border-l-2 border-primary font-normal"
+                                    i === messages.length - 1 && msg.role === "ai" && "border-l-2 border-primary font-medium"
                                 )}
                             >
                                 {msg.text}

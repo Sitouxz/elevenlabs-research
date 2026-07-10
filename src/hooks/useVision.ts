@@ -18,22 +18,29 @@ const VISION_MODEL =
     import.meta.env.VITE_VISION_MODEL ||
     "meta-llama/llama-4-scout-17b-16e-instruct";
 
+export { VISION_API_KEY, VISION_BASE_URL, VISION_MODEL };
+
 const DEFAULT_INTERVAL_MS = 10_000; // 10s between analyses
 const MAX_BACKOFF_MS = 120_000;
 
 const VISION_PROMPT =
     "You are an AI vision system feeding real-time descriptions to a voice " +
-    "assistant called JARVIS. Analyze this camera frame and provide a concise, " +
-    "natural description of what you see.\n\n" +
-    "Include:\n" +
-    "- Objects and their approximate positions/relationships\n" +
-    "- Any text or labels visible (OCR)\n" +
-    "- People and what they appear to be doing (if any)\n" +
-    "- Notable colors, brands, or distinguishing features\n" +
-    "- Context about the scene/environment\n\n" +
+    "assistant called Flare.\n\n" +
+    "There is a plain white rectangular sheet of paper/box on the surface. " +
+    "Your task: identify and describe ONLY the object(s) physically resting " +
+    "INSIDE the boundaries of that white rectangle. " +
+    "Treat the white rectangle as your entire field of view — everything outside it does not exist.\n\n" +
+    "For each object inside the white rectangle include:\n" +
+    "- What the object is (type, brand, model if readable)\n" +
+    "- Any text or labels visible on it (OCR)\n" +
+    "- Notable colors or distinguishing features\n\n" +
+    "STRICT RULES:\n" +
+    "- Do NOT describe the background, floor, table, projected overlay, UI elements, or anything outside the white rectangle.\n" +
+    "- Do NOT describe or mention the white rectangle itself in your response.\n" +
+    "- Do NOT use phrases like 'on the white box', 'on the white paper', 'on the white area', etc.\n" +
+    "- If nothing is inside the white rectangle, respond only: 'No object detected.'\n\n" +
     "Keep the description under 3 sentences. Be specific and factual. " +
-    'Do NOT say "I see an image" or "This is a photo" — describe the ' +
-    "contents directly as if you are looking through a camera in real time.";
+    'Do NOT say "I see an image" or "This is a photo" — describe directly as if looking through a camera in real time.';
 
 export interface VisionResult {
     description: string;
@@ -71,13 +78,15 @@ export const useVision = () => {
         (video: HTMLVideoElement): string | null => {
             try {
                 const canvas = document.createElement("canvas");
-                const scale = Math.min(1, 640 / (video.videoWidth || 640));
-                canvas.width = (video.videoWidth || 640) * scale;
-                canvas.height = (video.videoHeight || 480) * scale;
+                const scale = Math.min(1, 1920 / (video.videoWidth || 1920));
+                canvas.width = (video.videoWidth || 1920) * scale;
+                canvas.height = (video.videoHeight || 1080) * scale;
                 const ctx = canvas.getContext("2d");
                 if (!ctx) return null;
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = "high";
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
                 return dataUrl.split(",")[1];
             } catch {
                 return null;

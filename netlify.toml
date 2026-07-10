@@ -3,6 +3,6 @@
   publish = "dist"
 
 [[redirects]]
-  from = "/jarvis/*"
-  to = "/jarvis/index.html"
+  from = "/jarvis-test/*"
+  to = "/jarvis-test/index.html"
   status = 200

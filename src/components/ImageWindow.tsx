@@ -221,7 +221,7 @@ export const ImageWindow = ({
                                     ? "This may take 30\u201360s\u2026"
                                     : "via Replicate"}
                             </p>
-                            <p className="text-sm text-gray-300 font-light mt-3 leading-relaxed line-clamp-3">
+                            <p className="text-sm text-gray-200 font-normal mt-3 leading-relaxed line-clamp-3">
                                 "{w.prompt}"
                             </p>
                         </div>
