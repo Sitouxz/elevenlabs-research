@@ -75,3 +75,21 @@
       linear-gradient(to bottom, rgba(0, 238, 255, 0.03) 1px, transparent 1px);
   }
 }
+/* ---- Gesture mode -------------------------------------------------------- */
+/* Let the live camera show through the app. */
+body.gesture-mode #root > div:first-child {
+  background-color: transparent;
+}
+
+/* Backdrop blur over live video re-blurs every frame (GPU cost = latency). */
+body.gesture-mode .glass-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(8, 20, 22, 0.86);
+}
+
+/* Stand-in for :hover, which synthetic pointer events cannot trigger. */
+[data-gesture-hover] {
+  outline: 2px solid rgba(0, 238, 255, 0.95);
+  outline-offset: 3px;
+}

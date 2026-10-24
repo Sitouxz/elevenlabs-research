@@ -3,6 +3,7 @@ import { useState, useCallback, useRef } from "react";
 export const useCamera = () => {
     const [isCameraOn, setIsCameraOn] = useState(false);
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const [cameraError, setCameraError] = useState("");
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -12,9 +13,13 @@ export const useCamera = () => {
                 video: {
                     width: { ideal: 640 },
                     height: { ideal: 480 },
+                    // Every extra camera frame is one less frame of latency for
+                    // gesture tracking. Ideal, so 30fps cameras still work.
+                    frameRate: { ideal: 60 },
                     facingMode: "user",
                 },
             });
+            setCameraError("");
             setCameraStream(stream);
             setIsCameraOn(true);
 
@@ -24,6 +29,9 @@ export const useCamera = () => {
             }
         } catch (error) {
             console.error("Failed to start camera:", error);
+            setCameraError(
+                error instanceof Error ? error.message : "Camera unavailable"
+            );
         }
     }, []);
 
@@ -68,6 +76,7 @@ export const useCamera = () => {
     return {
         isCameraOn,
         cameraStream,
+        cameraError,
         videoRef,
         startCamera,
         stopCamera,

@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "setup:mediapipe": "node scripts/setup-mediapipe.mjs",
+    "predev": "npm run setup:mediapipe",
     "dev": "vite",
+    "prebuild": "npm run setup:mediapipe",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -12,6 +15,7 @@
   "dependencies": {
     "@11labs/client": "^0.2.0",
     "@elevenlabs/client": "^0.14.0",
+    "@mediapipe/tasks-vision": "1.1.1",
     "@tailwindcss/vite": "^4.1.18",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.0",

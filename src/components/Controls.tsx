@@ -1,4 +1,4 @@
-import { Mic, MicOff, PhoneOff, Hand, Camera, CameraOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Hand, Camera, CameraOff, Pointer } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface ControlsProps {
@@ -10,6 +10,9 @@ interface ControlsProps {
     onToggleMute: () => void;
     onInterrupt: () => void;
     onToggleCamera: () => void;
+    onStartGesture: () => void;
+    /** Fired on hover/focus/touch so the hand model loads before the click. */
+    onPreloadGesture: () => void;
 }
 
 export const Controls = ({
@@ -20,7 +23,9 @@ export const Controls = ({
     onEnd,
     onToggleMute,
     onInterrupt,
-    onToggleCamera
+    onToggleCamera,
+    onStartGesture,
+    onPreloadGesture
 }: ControlsProps) => {
     return (
         <div className="glass-panel px-4 py-3 sm:px-8 sm:py-4 rounded-2xl neon-border flex items-center space-x-4 sm:space-x-8 transform transition-transform hover:-translate-y-1 duration-300">
@@ -80,6 +85,27 @@ export const Controls = ({
                 </motion.div>
                 <span className={`text-[10px] font-mono tracking-wider uppercase ${isCameraOn ? "text-primary" : "text-primary/50 group-hover:text-primary"}`}>
                     {isCameraOn ? "Cam On" : "Cam Off"}
+                </span>
+            </button>
+
+            {/* Gesture Control Button: opens the camera fullscreen, hand-driven UI */}
+            <button
+                onClick={onStartGesture}
+                onPointerEnter={onPreloadGesture}
+                onFocus={onPreloadGesture}
+                onTouchStart={onPreloadGesture}
+                aria-label="Gesture control, fullscreen camera"
+                className="group flex flex-col items-center gap-1 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary rounded-lg"
+            >
+                <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-[0_0_10px_rgba(0,238,255,0.1)] bg-background-dark border border-primary/30 text-primary/70 hover:bg-primary/10 hover:text-primary hover:border-primary/50"
+                >
+                    <Pointer size={20} />
+                </motion.div>
+                <span className="text-[10px] font-mono tracking-wider uppercase text-primary/50 group-hover:text-primary">
+                    Gesture
                 </span>
             </button>
 

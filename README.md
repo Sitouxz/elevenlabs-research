@@ -85,6 +85,33 @@ This tool takes no parameters — it captures the current camera frame, runs it 
 
 The manual prompt input works without this configuration.
 
+## Gesture control
+
+The **Gesture** button in the control dock opens the camera fullscreen, mirrored behind the live UI, and lets you drive every element with your hand. It needs no API keys and runs entirely in the browser (Google MediaPipe Hand Landmarker, Apache-2.0). Inspired by [barehands](https://github.com/jaredrhod/barehands) (AGPL-3.0; none of its code is used here).
+
+| Gesture | Action |
+| --- | --- |
+| Point (index finger) | Move the cursor; controls highlight on hover |
+| Pinch (thumb + index), quick | Click |
+| Pinch and move | Drag (e.g. the floating image/video windows) |
+| Two fingers up (index + middle), move vertically | Scroll the element under the cursor |
+| Hold a fist for 1.5 s | Exit |
+
+You can also exit with the **Exit** button or `Esc`. Gesture mode cannot type: use voice for prompts.
+
+`npm run dev` and `npm run build` first run `scripts/setup-mediapipe.mjs`, which copies the MediaPipe wasm runtime out of `node_modules` and downloads `hand_landmarker.task` (~7.8 MB) into `public/mediapipe/` (gitignored). Self-hosting avoids a CDN round trip and works offline once cached. The build needs network access the first time.
+
+### Latency design
+
+- Tracking runs in a **Web Worker** on the GPU delegate (CPU fallback), so inference never blocks rendering. Only one hand is tracked (`numHands: 1`); more hands makes MediaPipe re-run palm detection every frame.
+- Frames are pulled with `requestVideoFrameCallback` (one per real camera frame, no polling), sent as transferred `ImageBitmap`s, and only the **newest** frame waits for the worker: stale frames are dropped, never queued.
+- Per-frame work bypasses React: the result goes straight to a canvas HUD and a synthetic DOM pointer (hover, click, drag and scroll events). Existing buttons and framer-motion drags work unchanged.
+- Cursor smoothing is a **One Euro filter** (strong smoothing when still, almost none when moving) plus a small velocity look-ahead. Pinch clicks anchor to where the fingertip was *before* the fingers closed, and a drag follows the knuckles rather than the closing fingers.
+- The camera is requested at 60 fps (ideal), the model is preloaded when the button is hovered or focused, and `backdrop-filter` is disabled in gesture mode (re-blurring live video every frame costs latency).
+- The stats chip in the HUD shows FPS and camera-to-cursor latency; hover it for model inference time.
+
+All thresholds live in `src/gesture/config.ts`. They were checked against real hand photos and synthetic landmark streams, but tune them on your own hand and camera if a gesture misfires.
+
 ## Production deployment
 
 The Vite dev proxy only runs in development. For production you must:

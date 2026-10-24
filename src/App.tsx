@@ -5,6 +5,8 @@ import { Transcript } from "./components/Transcript";
 import { CameraFeed } from "./components/CameraFeed";
 import { ImageStudio } from "./components/ImageStudio";
 import { ImageWindowManager } from "./components/ImageWindowManager";
+import { GestureMode } from "./components/GestureMode";
+import { HandTracker } from "./gesture/HandTracker";
 import { useElevenLabs } from "./hooks/useElevenLabs";
 import { useCamera } from "./hooks/useCamera";
 import { useVision } from "./hooks/useVision";
@@ -20,6 +22,9 @@ function App() {
   const isSpeakingRef = useRef(false);
   const processedMsgCountRef = useRef(0);
   const [hasSentFirstScan, setHasSentFirstScan] = useState(false);
+  const [isGestureActive, setIsGestureActive] = useState(false);
+  const cameraWasOnRef = useRef(false);
+  const gestureActiveRef = useRef(false);
 
   const {
     isConnected,
@@ -124,6 +129,29 @@ function App() {
 
   const handleToggleCamera = useCallback(async () => {
     await camera.toggleCamera();
+  }, [camera]);
+
+  const handleStartGesture = useCallback(() => {
+    // Fullscreen needs this click's user activation, so request it before
+    // anything else runs. If it's denied, gesture mode still works windowed.
+    // (Missing entirely on iPhone Safari, hence the guard.)
+    const root = document.documentElement;
+    if (root.requestFullscreen) {
+      root.requestFullscreen({ navigationUI: "hide" }).catch(() => undefined);
+    }
+    cameraWasOnRef.current = camera.isCameraOn;
+    gestureActiveRef.current = true;
+    setIsGestureActive(true);
+    if (!camera.isCameraOn) void camera.startCamera();
+  }, [camera]);
+
+  const handleExitGesture = useCallback(() => {
+    // Esc, fullscreenchange, the Exit button and the fist gesture can all fire.
+    if (!gestureActiveRef.current) return;
+    gestureActiveRef.current = false;
+    setIsGestureActive(false);
+    // Leave the camera as we found it.
+    if (!cameraWasOnRef.current) camera.stopCamera();
   }, [camera]);
 
   return (
@@ -244,6 +272,8 @@ function App() {
               onToggleMute={toggleMute}
               onInterrupt={interrupt}
               onToggleCamera={handleToggleCamera}
+              onStartGesture={handleStartGesture}
+              onPreloadGesture={HandTracker.preload}
             />
           </div>
           <div className="w-full md:w-[30%] lg:w-1/4 flex justify-end pointer-events-auto">
@@ -251,8 +281,10 @@ function App() {
           </div>
         </footer>
 
-        {/* Floating draggable Vision Feed window (hidden on mobile) */}
-        <div className="hidden md:block">
+        {/* Floating draggable Vision Feed window (hidden on mobile). In gesture
+            mode the camera is already fullscreen, so hide it, but keep it
+            mounted: scan_camera reads frames from its <video>. */}
+        <div className={isGestureActive ? "invisible" : "hidden md:block"}>
           <CameraFeed
             isCameraOn={camera.isCameraOn}
             isAnalyzing={vision.isAnalyzing}
@@ -272,6 +304,14 @@ function App() {
           onPositionChange={imageGen.updateWindowPosition}
         />
       </div>
+
+      {isGestureActive && (
+        <GestureMode
+          stream={camera.cameraStream}
+          cameraError={camera.cameraError}
+          onExit={handleExitGesture}
+        />
+      )}
     </div>
   );
 }
