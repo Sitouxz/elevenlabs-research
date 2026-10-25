@@ -3,10 +3,13 @@ export type ComputeOperation =
   | { task: "count_occurrences"; text: string; substring: string; caseSensitive?: boolean }
   | { task: "count_words"; text: string }
   | { task: "nth_word"; text: string; n: number }
+  | { task: "reverse"; text: string }
   | { task: "reverse_without_vowels"; text: string }
   | { task: "scramble"; text: string }
   | { task: "swap_chars"; text: string; charA: string; charB: string }
-  | { task: "arithmetic"; expression: string };
+  | { task: "arithmetic"; expression: string }
+  | { task: "date_offset"; from: string; offsetDays: number }
+  | { task: "current_date" };
 
 function safeArithmetic(expression: string): number {
   const sanitized = expression.replace(/\s/g, "");
@@ -51,6 +54,10 @@ export function compute(operation: ComputeOperation): string {
         }
         return `The ${n}th word is "${words[n - 1]}".`;
       }
+      case "reverse": {
+        const reversed = operation.text.split("").reverse().join("");
+        return `Reversed: "${reversed}".`;
+      }
       case "reverse_without_vowels": {
         const noVowels = operation.text.replace(/[aeiouAEIOU]/g, "");
         const reversed = noVowels.split("").reverse().join("");
@@ -83,6 +90,38 @@ export function compute(operation: ComputeOperation): string {
         const result = safeArithmetic(operation.expression);
         return `${operation.expression} = ${result}`;
       }
+      case "date_offset": {
+        // Parse as UTC noon to avoid DST/timezone edge cases shifting the day.
+        const base = new Date(`${operation.from}T12:00:00Z`);
+        if (isNaN(base.getTime())) {
+          return `Invalid date "${operation.from}". Use YYYY-MM-DD.`;
+        }
+        base.setUTCDate(base.getUTCDate() + operation.offsetDays);
+        const formatted = base.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "UTC",
+        });
+        return `${operation.offsetDays} day${operation.offsetDays === 1 ? "" : "s"} from ${operation.from} is ${formatted}.`;
+      }
+      case "current_date": {
+        // Read the real "now" from the device clock every call so the answer is
+        // never stale or hallucinated. Format in the user's local timezone.
+        const now = new Date();
+        const formatted = now.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+        const time = now.toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return `Right now it is ${formatted}, ${time}.`;
+      }
       default:
         return "Unknown compute task.";
     }
@@ -98,9 +137,11 @@ if (import.meta.env.DEV) {
     { op: { task: "age", birthYear: 1997, targetYear: 2027 }, want: "30" },
     { op: { task: "count_words", text: "one two three four five" }, want: "5" },
     { op: { task: "nth_word", text: "one two three four five", n: 5 }, want: "five" },
+    { op: { task: "reverse", text: "informatics" }, want: "scitamrofni" },
     { op: { task: "reverse_without_vowels", text: "informatics" }, want: "sctmrfn" },
     { op: { task: "swap_chars", text: "informatics", charA: "n", charB: "f" }, want: "ifornmatics" },
     { op: { task: "arithmetic", expression: "2027 - 1997" }, want: "30" },
+    { op: { task: "date_offset", from: "2026-07-08", offsetDays: 23 }, want: "Friday, 31 July 2026" },
   ];
   for (const { op, want } of checks) {
     const got = compute(op);

@@ -1,7 +1,7 @@
 {
   "name": "elevenlabs-research",
   "private": true,
-  "version": "0.3.10",
+  "version": "0.4.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,9 +12,11 @@
   "dependencies": {
     "@11labs/client": "^0.2.0",
     "@elevenlabs/client": "^0.14.0",
+    "@google/model-viewer": "^4.3.1",
     "@tailwindcss/vite": "^4.1.18",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

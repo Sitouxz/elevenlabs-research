@@ -6,22 +6,44 @@ import { Transcript } from "./components/Transcript";
 import { CameraFeed } from "./components/CameraFeed";
 // import { ImageStudio } from "./components/ImageStudio";
 import { ImageWindowManager } from "./components/ImageWindowManager";
+import { ObjectViewerManager } from "./components/ObjectViewerManager";
+import { MapPopup } from "./components/MapPopup";
+import { SettingsSidebar } from "./components/SettingsSidebar";
+import { FaceAnalysisPopup } from "./components/FaceAnalysisPopup";
 import { useElevenLabs } from "./hooks/useElevenLabs";
 import { useCamera } from "./hooks/useCamera";
 import { useVision } from "./hooks/useVision";
 import { useImageGeneration } from "./hooks/useImageGeneration";
+import { useObjectScan } from "./hooks/useObjectScan";
+import { useSketchToReal } from "./hooks/useSketchToReal";
+import { useFaceAnalysis } from "./hooks/useFaceAnalysis";
+import { useMapPopup } from "./hooks/useMapPopup";
+
+
+import { useNetworkStatus } from "./hooks/useNetworkStatus";
 import {
   checkPromptSafety,
   getModerationRefusalMessage,
 } from "./utils/contentModeration";
 import { compute as runCompute, type ComputeOperation } from "./utils/compute";
-import { Activity, ShieldCheck, Eye, Hand } from "lucide-react";
+import { getCurrentWeather } from "./utils/weather";
+import { Activity, ShieldCheck, Eye, Hand, Wifi, WifiOff, Settings } from "lucide-react";
+
 
 const AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "PASTE_YOUR_AGENT_ID_HERE";
 
 // ponytail: flip to switch the "must say Flare/Flair to get a response" gate
 // on or off — Vite HMR picks it up immediately, no other code to touch.
 const REQUIRE_WAKE_WORD = true;
+
+// How long to keep the mic gated waiting for the agent to START responding
+// after the user's turn. This is only a safety net for a *missed* turn (the
+// agent never speaks and never emits a "." gate reply) — the gate is normally
+// released the instant the agent starts→stops speaking or the "." arrives. Kept
+// short so a dropped turn recovers quickly instead of locking the user out.
+// Once the agent actually starts speaking, this timer is cancelled so a long
+// reply is never cut off mid-sentence.
+const NO_RESPONSE_TIMEOUT_MS = 6_000;
 
 function App() {
   const camera = useCamera();
@@ -77,10 +99,92 @@ function App() {
     setGateMuted,
     interrupt,
     sendContextualUpdate,
+    sendUserMessage,
     registerClientTools,
   } = useElevenLabs(AGENT_ID);
 
+
   const imageGen = useImageGeneration();
+  const objectScan = useObjectScan();
+
+  // Sketch → Realism: listen for the Unity "image" event (base64 drawing),
+  // upload it to Cloudinary, then generate a photoreal version using the
+  // uploaded sketch as the reference. generate() opens a display window AND
+  // pushes the result URL back to Unity over the socket (sendToXR).
+  useSketchToReal({
+    generate: imageGen.generate,
+    onSpeak: useCallback((message: string) => {
+      // Trigger the agent to actually voice the acknowledgement. Reads from a
+      // ref so this callback identity is stable and the socket never reconnects.
+      sendUserMessageRef.current?.(message);
+    }, []),
+  });
+  const mapPopup = useMapPopup();
+
+  // Settings sidebar (multi-camera config). Toggled with the "A" key or the
+  // gear icon at bottom-left of the screen.
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Face-analysis flow ("scan my face and analyze"). Reads the user-assigned
+  // face camera (falling back to the object camera's stream) via refs so the
+  // hook's callbacks never need to re-create when the selection changes.
+  const faceCameraIdRef = useRef(camera.faceCameraId);
+  useEffect(() => {
+    faceCameraIdRef.current = camera.faceCameraId;
+  }, [camera.faceCameraId]);
+  const cameraStreamRef = useRef(camera.cameraStream);
+  useEffect(() => {
+    cameraStreamRef.current = camera.cameraStream;
+  }, [camera.cameraStream]);
+
+  const faceAnalysis = useFaceAnalysis(
+    camera.openStreamForDevice,
+    useCallback(() => faceCameraIdRef.current, []),
+    useCallback(() => cameraStreamRef.current, []),
+  );
+  const faceAnalysisRef = useRef(faceAnalysis);
+  useEffect(() => {
+    faceAnalysisRef.current = faceAnalysis;
+  }, [faceAnalysis]);
+
+  // sendContextualUpdate / sendUserMessage read from refs so the face-analysis
+  // tool (registered once at mount) can push the final summary to the agent
+  // when the slow n8n analysis eventually resolves — without re-registering
+  // tools. sendContextualUpdate only injects silent background context (agent
+  // won't speak on its own); sendUserMessage injects a turn that TRIGGERS the
+  // agent to actually speak, so that's what we use to voice the result.
+  const sendContextualUpdateRef = useRef(sendContextualUpdate);
+  useEffect(() => {
+    sendContextualUpdateRef.current = sendContextualUpdate;
+  }, [sendContextualUpdate]);
+  const sendUserMessageRef = useRef(sendUserMessage);
+  useEffect(() => {
+    sendUserMessageRef.current = sendUserMessage;
+  }, [sendUserMessage]);
+
+
+
+
+
+  // Real network telemetry (round-trip latency + connection strength) for the
+  // System Monitor widget. Only probe while connected to avoid needless
+  // background requests when the assistant is idle.
+  const network = useNetworkStatus(isConnected);
+
+  // Map the qualitative strength to a Tailwind color + label + signal-bar count
+  // so the widget can render a live indicator instead of the old fake "24ms".
+  const STRENGTH_META: Record<
+    typeof network.strength,
+    { label: string; color: string; bars: number }
+  > = {
+    excellent: { label: "EXCELLENT", color: "text-green-400", bars: 4 },
+    good: { label: "GOOD", color: "text-green-400", bars: 3 },
+    fair: { label: "FAIR", color: "text-yellow-400", bars: 2 },
+    poor: { label: "POOR", color: "text-red-400", bars: 1 },
+    offline: { label: "OFFLINE", color: "text-red-500", bars: 0 },
+    unknown: { label: "—", color: "text-gray-400", bars: 0 },
+  };
+  const strengthMeta = STRENGTH_META[network.strength];
 
   // Register the generate_image client tool ONCE at mount. The handler reads
   // the latest imageGen.generate from a ref so we don't need to re-register
@@ -106,6 +210,14 @@ function App() {
   useEffect(() => {
     visionRef.current = vision;
   }, [vision]);
+
+  // 3D object scan hook — read the latest scanToObject from a ref so the
+  // client-tool handler doesn't need to re-register when the hook updates.
+  const objectScanRef = useRef(objectScan);
+  useEffect(() => {
+    objectScanRef.current = objectScan;
+  }, [objectScan]);
+
 
   // Last should_respond decision, used to interrupt the agent if it starts
   // speaking despite a SILENT gate result. No-op when REQUIRE_WAKE_WORD is off,
@@ -274,7 +386,7 @@ function App() {
         const refNote = refImage
           ? " (using previous image as reference)"
           : "";
-        return `Generating an image of "${promptStr}"${refNote}. It will appear on screen in a moment.`;
+        return `Generating an image of "${promptStr}"${refNote}. It will be ready in about 5 to 10 seconds — it will appear on screen when ready.`;
       },
       generate_video: ({ prompt }) => {
         console.log("[FLARE tool] generate_video invoked with:", prompt);
@@ -309,7 +421,111 @@ function App() {
         }
         return `Here is what the camera sees right now: ${result.description}`;
       },
+      scan_to_3d: async ({ object_name }) => {
+        console.log("[FLARE tool] scan_to_3d invoked", object_name ?? "");
+
+        // Auto-enable the camera if it's off so the user doesn't have to
+        // turn it on manually before asking to scan an object into 3D.
+        if (!camera.isCameraOn) {
+          console.log("[FLARE tool] scan_to_3d: camera off, turning it on");
+          await camera.startCamera();
+        }
+
+        // Wait for the <video> element to have a decoded frame ready
+        // (readyState >= 2). getUserMedia + play() resolve before the first
+        // frame is actually paintable, so capturing immediately can yield a
+        // blank canvas. Poll briefly for up to ~4s.
+        const waitForFrame = async (): Promise<HTMLVideoElement | null> => {
+          const start = Date.now();
+          while (Date.now() - start < 4000) {
+            const v = camera.videoRef.current;
+            if (v && v.readyState >= 2 && v.videoWidth > 0) return v;
+            await new Promise((r) => setTimeout(r, 120));
+          }
+          return camera.videoRef.current;
+        };
+
+        const video = await waitForFrame();
+        if (!video || video.readyState < 2 || video.videoWidth === 0) {
+          return "I couldn't get a clear camera frame to scan. Please make sure the camera is on and the object is visible, then try again.";
+        }
+
+        const label =
+          typeof object_name === "string" && object_name.trim()
+            ? object_name.trim()
+            : "Scanned object";
+
+        const result = await objectScanRef.current.scanToObject(video, label);
+        return result.message;
+      },
+      generate_3d: ({ prompt, object_name }) => {
+        console.log("[FLARE tool] generate_3d invoked with:", prompt);
+        const promptStr = typeof prompt === "string" ? prompt.trim() : "";
+        if (!promptStr) {
+          return "I need a description of the object you'd like me to build in 3D.";
+        }
+
+        const moderation = checkPromptSafety(promptStr);
+        if (moderation.blocked) {
+          console.log(
+            "[FLARE tool] generate_3d blocked by moderation:",
+            moderation.category,
+          );
+          return getModerationRefusalMessage(moderation);
+        }
+
+        const label =
+          typeof object_name === "string" && object_name.trim()
+            ? object_name.trim()
+            : undefined;
+
+        const result = objectScanRef.current.generateFromText(promptStr, label);
+        return result.message;
+      },
+      scan_face_analyze: () => {
+        console.log("[FLARE tool] scan_face_analyze invoked");
+        // The analysis backend (n8n → a slow "thinking" vision model) can take
+        // much longer than ElevenLabs' client-tool response window, which made
+        // the agent give up and improvise an error even though the popup filled
+        // in fine. So mirror the 3D-scan pattern: kick the analysis off in the
+        // BACKGROUND, return IMMEDIATELY with a status message, and push the
+        // real spoken summary via a contextual update when it resolves.
+        faceAnalysisRef.current
+          .analyzeFace()
+          .then((summary) => {
+            console.log("[FLARE tool] scan_face_analyze done, pushing summary");
+            // sendUserMessage (not sendContextualUpdate) so the agent actually
+            // SPEAKS — contextual updates are silent background context the
+            // agent won't voice on its own. The message is phrased as an
+            // instruction and includes the wake word "Flare" so the
+            // should_respond gate returns RESPOND instead of silencing it.
+            sendUserMessageRef.current(
+              `[SYSTEM to Flare] The face analysis just finished. Flare, say this ` +
+              `result to the user now, out loud and naturally, framing age and gender ` +
+              `as friendly best-effort visual estimates: "${summary}"`
+            );
+          })
+          .catch((err) => {
+            console.error("[FLARE tool] scan_face_analyze failed:", err);
+            sendUserMessageRef.current(
+              `[SYSTEM to Flare] The face analysis failed: ${
+                err?.message || "unknown error"
+              }. Flare, briefly apologize to the user and ask them to try again.`
+            );
+          });
+
+        return (
+          "Scanning the user's face now and analyzing it — the result appears in a " +
+          "popup and takes a few seconds. Tell the user you're analyzing their face and " +
+          "will share the results in a moment. Do NOT make up any result yet; the real " +
+          "summary will arrive as a follow-up system message."
+        );
+      },
+
+
       mute_microphone: () => {
+
+
         console.log("[FLARE tool] mute_microphone invoked");
         if (isMutedRef.current) {
           return "The microphone is already muted.";
@@ -350,7 +566,7 @@ function App() {
         lastGateDecisionRef.current = "SILENT";
         return "SILENT";
       },
-      compute: ({ task, text, substring, n, birth_year, target_year, expression, case_sensitive, char_a, char_b }) => {
+      compute: ({ task, text, substring, n, birth_year, target_year, expression, case_sensitive, char_a, char_b, from, offset_days }) => {
         console.log("[FLARE tool] compute invoked:", task);
         const opTask = typeof task === "string" ? task : "";
         const opText = typeof text === "string" ? text : "";
@@ -362,31 +578,75 @@ function App() {
         const opCaseSensitive = case_sensitive === true;
         const opCharA = typeof char_a === "string" ? char_a : "";
         const opCharB = typeof char_b === "string" ? char_b : "";
+        // Default the base date to today (LOCAL date, not UTC — toISOString()
+        // would roll a day forward/back in timezones like UTC+7) so the agent
+        // can pass just offset_days.
+        const localToday = (() => {
+          const d = new Date();
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${day}`;
+        })();
+        const opFrom = typeof from === "string" && from ? from : localToday;
+        const opOffsetDays = typeof offset_days === "number" ? offset_days : Number(offset_days || 0);
 
         const opMap: Record<string, ComputeOperation | null> = {
           age: { task: "age", birthYear: opBirthYear, targetYear: opTargetYear },
           count_occurrences: { task: "count_occurrences", text: opText, substring: opSub, caseSensitive: opCaseSensitive },
           count_words: { task: "count_words", text: opText },
           nth_word: { task: "nth_word", text: opText, n: opN },
+          reverse: { task: "reverse", text: opText },
           reverse_without_vowels: { task: "reverse_without_vowels", text: opText },
           scramble: { task: "scramble", text: opText },
           swap_chars: { task: "swap_chars", text: opText, charA: opCharA, charB: opCharB },
           arithmetic: { task: "arithmetic", expression: opExpr },
+          date_offset: { task: "date_offset", from: opFrom, offsetDays: opOffsetDays },
+          current_date: { task: "current_date" },
         };
 
         const operation = opMap[opTask];
         if (!operation) {
-          return `Unknown compute task "${opTask}". Available tasks: age, count_occurrences, count_words, nth_word, reverse_without_vowels, scramble, swap_chars, arithmetic.`;
+          return `Unknown compute task "${opTask}". Available tasks: age, count_occurrences, count_words, nth_word, reverse, reverse_without_vowels, scramble, swap_chars, arithmetic, date_offset, current_date.`;
         }
         return runCompute(operation);
+      },
+      check_weather: async () => {
+        console.log("[FLARE tool] check_weather invoked");
+        try {
+          return await getCurrentWeather();
+        } catch (err) {
+          console.error("[FLARE tool] check_weather failed:", err);
+          if (err instanceof GeolocationPositionError && err.code === err.PERMISSION_DENIED) {
+            return "I couldn't check the weather because location access was denied. Please allow location permissions and try again.";
+          }
+          return "I couldn't check the weather right now. Please try again in a moment.";
+        }
+      },
+      show_map: async ({ location, destination }) => {
+        console.log("[FLARE tool] show_map invoked with:", location, destination);
+        const locationStr = typeof location === "string" ? location.trim() : "";
+        const destinationStr = typeof destination === "string" ? destination.trim() : "";
+        if (!locationStr) {
+          return "I need a location to show on the map.";
+        }
+        if (destinationStr) {
+          return mapPopup.showDistance(locationStr, destinationStr);
+        }
+        return mapPopup.showLocation(locationStr);
       },
     });
     console.log(
       "[FLARE] Client tools registered: generate_image, generate_video, scan_camera, " +
-      "mute_microphone, unmute_microphone, should_respond, compute. " +
-      "NOTE: For voice triggers to work, all tools must ALSO be declared " +
+      "scan_to_3d, generate_3d, scan_face_analyze, mute_microphone, unmute_microphone, should_respond, compute, check_weather, " +
+
+      "show_map. NOTE: For voice triggers to work, all tools must ALSO be declared " +
       "on the agent dashboard. See README for instructions."
     );
+
+
+    // mapPopup.showLocation/showDistance are stable (useCallback with no deps),
+    // so referencing them here doesn't need to be in the effect's deps array.
   }, [registerClientTools, camera, isMutedRef]);
 
   // Keep isSpeakingRef in sync for use inside callbacks
@@ -407,67 +667,35 @@ function App() {
   useEffect(() => {
     if (isConnected && !hasSentFirstScanRef.current) {
       const gateRule = REQUIRE_WAKE_WORD
-        ? `\n\nCRITICAL RULE — Before responding to ANY user message, you MUST call ` +
-          `the should_respond tool with the user's exact message. ` +
-          `\n\nIf the tool returns a response starting with "SILENT", your ENTIRE ` +
-          `response must be exactly a single dot character: "." and nothing else. ` +
-          `No words, no explanation, no apology — just "." ` +
-          `\n\nIf the tool returns a response starting with "RESPOND", reply naturally ` +
-          `and helpfully. ` +
-          `\n\ncalling should_respond is ONLY a gate that decides whether you speak at ` +
-          `all — it is NOT a substitute for any other tool call, and saying should_respond ` +
-          `returned "RESPOND" does not fulfill the user's request by itself. If the ` +
-          `user's message asks you to DO something (generate an image or video, scan the ` +
-          `camera, mute/unmute the mic, or any precise counting/math/indexing/string task), ` +
-          `you MUST call should_respond first, AND THEN, in that same turn, ALSO call the ` +
-          `specific tool for that action (e.g. generate_image, generate_video, scan_camera, ` +
-          `mute_microphone, unmute_microphone, compute) before or while you speak. NEVER say ` +
-          `things like "I'll generate that for you" or "sure, one ` +
-          `moment" and then stop without actually calling the action tool — a spoken promise ` +
-          `to do something is meaningless unless the corresponding tool call actually happens ` +
-          `in the same turn. You are allowed and expected to call more than one tool per turn. ` +
-          `\n\nThe ONLY exception is your very first greeting after connecting — ` +
-          `you may greet the user once without calling the tool. `
-        : `\n\nCRITICAL RULE — Respond immediately to every user message, without ` +
-          `waiting for them to say your name first. ` +
-          `\n\nIf the user's message asks you to DO something (generate an image or ` +
-          `video, scan the camera, mute/unmute the mic, or any precise counting/math/indexing/string ` +
-          `task), you MUST ALSO call the specific tool for that action (e.g. generate_image, ` +
-          `generate_video, scan_camera, mute_microphone, unmute_microphone, compute) before or ` +
-          `while you speak. NEVER say things like "I'll generate that for you" or "sure, one ` +
-          `moment" and then stop without actually calling the action tool — a spoken promise ` +
-          `to do something is ` +
-          `meaningless unless the corresponding tool call actually happens in the same ` +
-          `turn. You are allowed and expected to call more than one tool per turn. `;
+        ? `\n\nGATE — Before replying to ANY message, call should_respond with the user's ` +
+          `exact message. If it returns "SILENT", reply with exactly "." (nothing else). ` +
+          `If "RESPOND", reply normally. The gate only decides IF you speak — it never ` +
+          `fulfills a request. If the message asks you to DO something, call should_respond ` +
+          `AND the matching action tool in the SAME turn; never promise an action without ` +
+          `calling its tool. You may call multiple tools per turn. Exception: your first ` +
+          `greeting after connecting needs no gate call. `
+        : `\n\nRespond immediately to every message (no wake word needed). If the message ` +
+          `asks you to DO something, call the matching action tool in the SAME turn; never ` +
+          `promise an action without calling its tool. You may call multiple tools per turn. `;
 
       const precisionRule =
-        `\n\nCRITICAL RULE — For any request that requires precise counting, arithmetic, ` +
-        `dates/ages, word indexing, or exact string manipulation, do NOT guess or rely on ` +
-        `mental reasoning. Call the compute tool with the correct task and parameters, then ` +
-        `read the result back to the user. ` +
-        `\n\nUse compute for: exact word counts (e.g. "reply in exactly 15 words"), ` +
-        `letter/substring counts, age in a given year, finding the Nth word, reversing ` +
-        `strings with or without vowels, scrambling words, swapping characters, and basic ` +
-        `arithmetic. ` +
-        `\n\nExamples: ` +
-        `- "How old in 2027 if born in 1997?" → task=age, birth_year=1997, target_year=2027. ` +
-        `- "Reply in exactly 15 words" → draft your response, call task=count_words with ` +
-        `text=<your draft>, and adjust until the count is exactly 15 before speaking. ` +
-        `- "How many a's in 'A data analyst...'?" → task=count_occurrences, ` +
-        `text=<the phrase>, substring="a". ` +
-        `- "What is the 5th word?" → task=nth_word, text=<the phrase>, n=5. ` +
-        `- "Reverse 'informatics' without vowels" → task=reverse_without_vowels, text="informatics". ` +
-        `- "Scramble 'informatics'" → task=scramble, text="informatics". ` +
-        `- "Switch N and F in 'informatics'" or "Reverse the N and F in 'informatics'" ` +
-        `→ task=swap_chars, text="informatics", char_a="n", char_b="f". `;
+        `\n\nPRECISION — Never do counting, arithmetic, dates/ages, word indexing, or ` +
+        `string manipulation in your head. Call compute and read back its result. Tasks: ` +
+        `count_words, count_occurrences, nth_word, age, arithmetic, scramble, swap_chars ` +
+        `(char_a/char_b), reverse (keeps vowels — use for plain "reverse it"), and ` +
+        `reverse_without_vowels (ONLY when the user says "without vowels"). For "reply in ` +
+        `exactly N words", draft, call count_words, adjust to N before speaking. ` +
+        `\n\nFor "what day/date/time is it (now/today)", do NOT answer from memory or the ` +
+        `system date — ALWAYS call compute with task="current_date" (no other args) and read ` +
+        `back its result verbatim (it gives the live weekday, date, and time). ` +
+        `For ANY "N days from now / ago / what day is <date>" question, do NOT count ` +
+        `weekdays yourself — ALWAYS call date_offset with offset_days (0=today, +future, ` +
+        `-past) and optional from="YYYY-MM-DD", then say BOTH weekday and date `;
 
       const formatRule =
-        `\n\nCRITICAL RULE — Preserve all formatting characters the user asks for. ` +
-        `Never strip or spell out currency symbols ($, €, £), date/time punctuation ` +
-        `(slashes, colons, commas, AM/PM), arithmetic operators (+, -, *, /, =), ` +
-        `percent signs, decimal points, or other special characters. Echo the exact ` +
-        `formatted result from any tool (e.g. the compute tool) without rewriting it ` +
-        `into plain words.`;
+        `\n\nFORMAT — Keep formatting characters the user asks for: currency ($ € £), ` +
+        `date/time punctuation, operators (+ - * / =), %, and decimals. Echo tool results ` +
+        `verbatim; never spell them out.`;
 
       const now = new Date();
       const dateStr = now.toLocaleDateString("en-GB", {
@@ -480,64 +708,75 @@ function App() {
 
       sendContextualUpdate(
         `[SYSTEM] You are Flare, a voice AI assistant. ` +
-        `Today's date is ${dateStr} (${isoDate}). Use this exact date as the reference for all day/date calculations. ` +
-        `\n\nCRITICAL RULE — Whenever your reply contains a number (dates, counts, ` +
-        `quantities, times, etc.), write it using digits, not spelled-out words — ` +
-        `e.g. "6 July 2026" and "3 apples", never "six July two thousand and twenty ` +
-        `six" or "three apples". This applies to every message you send, not just the ` +
-        `first one. ` +
+        `Today's date is ${dateStr} (${isoDate}); use it for all day/date calculations. ` +
+        `\n\nNUMBERS — Always write numbers as digits, not words (e.g. "6 July 2026", ` +
+        `"3 apples"), in every message. ` +
         gateRule +
         precisionRule +
         formatRule +
-        `\n\nDo NOT correct the user ` +
-        `if they call you by the wrong name (e.g., Jarvis, Alexa, Siri, Cortana). ` +
-        `Just respond naturally without acknowledging the name mix-up. ` +
-        `\n\nYou have live camera vision. You CAN see through the user's camera. ` +
-        `Whenever the user asks what's on their screen, what you can see, or to look at ` +
-        `something, call the scan_camera tool to capture and read the current frame, then ` +
-        `answer from its result. Never say you don't have access to the camera. ` +
-        `\n\nYou CAN generate images. When the user asks for an image, you MUST ` +
-        `actually call the generate_image tool with a detailed prompt describing ` +
-        `exactly what they want — do this immediately, in the same turn as your ` +
-        `spoken reply. Do NOT just say you will generate it and stop there. ` +
-        `\n\nIMPORTANT — Image editing/iteration: When the user asks to modify, ` +
-        `edit, or change a previously generated image (e.g. "make it turn left", ` +
-        `"change it to white", "add ornaments", "paint him blue"), you MUST pass ` +
-        `use_last_image: true in your generate_image call. This tells the system ` +
-        `to use the last generated image as a reference, keeping the same subject ` +
-        `and style while applying the user's changes. ` +
-        `\n\nWhen the user asks for something COMPLETELY NEW and unrelated to the ` +
-        `previous image (e.g. they want a different subject entirely), pass ` +
-        `use_last_image: false to force a fresh generation without any reference. ` +
-        `\n\nIf you're unsure whether the user wants an edit or a brand-new, unrelated ` +
-        `image, you can leave use_last_image unset — the system will auto-decide based ` +
-        `on how recently the last image was made AND whether the new request shares a ` +
-        `subject with it. To be safe, always pass use_last_image: false whenever the ` +
-        `user explicitly asks for something new/different/unrelated to what you just ` +
-        `generated, so it definitely does NOT reuse the previous image. ` +
-        `\n\nSome generate_image/generate_video requests will be automatically ` +
-        `refused by the tool itself — for prompts containing profanity, prompts ` +
-        `depicting a real person committing a crime or illegal act, or requests to ` +
-        `create replicas of ID cards, passports, or other identity documents. When ` +
-        `this happens the tool's return value IS the message to say — relay it to ` +
-        `the user as your response, don't retry the call, don't apologize further, ` +
-        `and don't argue with the refusal. ` +
-        `\n\nYou CAN mute and unmute the user's microphone. ` +
-        `Whenever the user asks to be muted — for example: "mute me", "mute myself", ` +
-        `"stop listening", "don't listen", "be quiet", "stop talking", "I need privacy", ` +
-        `or anything indicating they want you to stop hearing them — call the ` +
-        `mute_microphone tool immediately. Do NOT argue or explain that you can't ` +
-        `mute — just call the tool and it will be done. ` +
-        `\n\nNEVER call mute_microphone on your own initiative — not because the user ` +
-        `has been silent, not because there was a long pause, not because the camera or ` +
-        `conversation has been idle for a while, and not as a guess about what they want. ` +
-        `Silence is not a reason to mute. Only call mute_microphone when the user's own ` +
-        `words explicitly ask for it. ` +
-        `\n\nWhenever the user asks to be unmuted — for example: "unmute me", ` +
-        `"unmute myself", "start listening", "listen again", "come back", "I'm back", ` +
-        `or anything indicating they want you to hear them again — call the ` +
-        `unmute_microphone tool immediately. Do NOT argue or explain that you can't ` +
-        `unmute — just call the tool and it will be done.`
+        `\n\nLANGUAGE — English ONLY. Whatever language the user speaks, never switch or ` +
+        `translate; if they use another language, reply in English that you only ` +
+        `understand English and ask them to repeat in English. ` +
+        `\n\nDon't correct a wrong name (Jarvis, Alexa, Siri, etc.) — just answer naturally. ` +
+
+        `\n\nTOOLS — You have real capabilities; never say you lack access. Call the tool ` +
+        `and answer from its result:` +
+        `\n- CAMERA: for "what do you see / look at this / what's on screen", call scan_camera.` +
+        `\n- 3D SCAN: for "scan this object and recreate it / make a 3D of it / scan this in the ` +
+        `camera and create the 3D / turn this into a 3D model / 3D scan this", call scan_to_3d. ` +
+        `It auto-turns the camera on, captures the object, and starts building an interactive 3D ` +
+        `model the user can rotate on screen. Pass object_name if the user named the object. ` +
+        `Generation runs in the BACKGROUND and takes a few minutes — the tool returns IMMEDIATELY ` +
+        `with a status message once capture starts; a loading window appears and fills in on its ` +
+        `own when the model is ready. Relay the tool's returned message; don't promise without ` +
+        `calling it, and don't claim it's done or failed just because the tool returned quickly.` +
+        `\n- 3D FROM TEXT: for "generate/make/create a 3D of X / build a 3D model of X / I want a ` +
+        `3D X" where X is described in words (NO camera involved), call generate_3d with ` +
+        `prompt=a detailed description of X (and object_name=the short name if given). This ` +
+        `builds the model purely from the text prompt — do NOT turn the camera on. Same as the ` +
+        `3D scan otherwise: it runs in the BACKGROUND for a few minutes, returns IMMEDIATELY with ` +
+        `a status message, and a loading window fills in on its own when ready. Use scan_to_3d ` +
+        `ONLY when the user wants to capture a real object via the camera; use generate_3d when ` +
+        `they just describe what they want in words. Relay the tool's returned message.` +
+        `\n- FACE ANALYSIS: for "scan my face and analyze / scan face and analyze / analyze my ` +
+        `face / do a color analysis on me / analyze the person in front of the camera", call ` +
+        `scan_face_analyze (no arguments). It uses the dedicated face camera and shows a loading ` +
+        `popup. The analysis runs in the BACKGROUND and takes several seconds — the tool returns ` +
+        `IMMEDIATELY with a status message. Relay that status (tell the user you're analyzing ` +
+        `their face and will share results shortly) and do NOT invent any result. When the ` +
+        `analysis finishes you'll get a follow-up [SYSTEM] message containing the real summary ` +
+        `(age, gender, color analysis, best outfit) — at THAT point say it out loud naturally, ` +
+        `framing age/gender as friendly best-effort visual estimates. A details popup appears on ` +
+        `screen automatically.` +
+
+
+
+        `\n- WEATHER: ONLY call check_weather when the user explicitly asks about weather, ` +
+
+
+        `temperature, rain, forecast, or conditions. Never call it for a location/place ` +
+        `question. If location was denied, relay that and ask to allow permissions.` +
+        `\n- MAP/LOCATION: for ANY place or location question — "where is X", "show me X", ` +
+        `"find X on the map", "how far is X" — call show_map with location=X (do NOT call ` +
+        `check_weather). For distance between two places, add destination=Y. Use the tool's ` +
+        `text; never guess a distance. Never respond to a location question by checking the weather.` +
+        `\n- IMAGES: for an image request, call generate_image with a detailed prompt in the ` +
+        `same turn (don't just promise it). To edit/change the previous image, pass ` +
+        `use_last_image:true; for something new/unrelated, use_last_image:false; if unsure, ` +
+        `leave it unset (auto-decides by recency + shared subject).` +
+        `\n- IMAGE EDITS: You CAN edit/modify an image you already generated — never say you ` +
+        `can't change its color, remove/add something, or alter it, and never ask "would you ` +
+        `like a new image?". When the user asks to change/recolor/modify/adjust "the ..." or ` +
+        `"it" right after an image (e.g. "make the table white", "change its color", "remove ` +
+        `the background"), IMMEDIATELY call generate_image with use_last_image:true and a ` +
+        `prompt describing the edited result. Don't refuse, don't ask permission, just do it.` +
+
+        `\n- Some image/video prompts are auto-refused (profanity, real person doing a crime, ` +
+        `ID/passport replicas). The tool's return value IS your reply — relay it, don't retry or argue.` +
+        `\n- MUTE: when the user asks to be muted ("mute me", "stop listening", "be quiet", ` +
+        `"I need privacy"), call mute_microphone. NEVER mute on your own — silence/pauses are ` +
+        `not a reason. When they ask to be unmuted ("unmute me", "I'm back", "listen again"), ` +
+        `call unmute_microphone. Don't argue about muting — just call the tool.`
       );
       hasSentFirstScanRef.current = true;
       console.log("[FLARE] System prompt sent.");
@@ -600,7 +839,7 @@ function App() {
           "[FLARE] Agent never spoke back after the user's turn — releasing the mic gate."
         );
         clearAwaitingAgentTurn();
-      }, 12_000);
+      }, NO_RESPONSE_TIMEOUT_MS);
     } else if (
       last &&
       last.role === "ai" &&
@@ -611,7 +850,7 @@ function App() {
       // with effectively no audio, so isSpeaking often never flips
       // true→false for it — the normal turn-gate release below never
       // fires, leaving the mic gated (and the user's next attempts
-      // dropped) until the 12s fallback timeout. The "." text arriving
+      // dropped) until the no-response fallback timeout. The "." text arriving
       // is itself a reliable "turn's over" signal, so open the gate now.
       clearAwaitingAgentTurn();
       setGateMuted(false);
@@ -620,6 +859,15 @@ function App() {
 
   const wasSpeakingForTurnGateRef = useRef(false);
   useEffect(() => {
+    // Agent STARTED speaking (false→true): cancel the no-response fallback
+    // timer so a long reply is never cut off mid-sentence by it. The gate
+    // stays closed and is released below only when speech actually ends.
+    if (!wasSpeakingForTurnGateRef.current && isSpeaking && awaitingAgentTurnRef.current) {
+      if (awaitingAgentTurnTimeoutRef.current !== null) {
+        window.clearTimeout(awaitingAgentTurnTimeoutRef.current);
+        awaitingAgentTurnTimeoutRef.current = null;
+      }
+    }
     if (wasSpeakingForTurnGateRef.current && !isSpeaking && awaitingAgentTurnRef.current) {
       clearAwaitingAgentTurn();
       // Open the mic gate in this same pass instead of waiting for the
@@ -689,11 +937,28 @@ function App() {
       } else if (e.key === "o" || e.key === "O") {
         e.preventDefault();
         setInterruptEnabled((prev) => !prev);
+      } else if (e.key === "a" || e.key === "A") {
+        // Toggle the multi-camera settings sidebar.
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isConnected, isConnecting, startConversation, interrupt, handleToggleCamera]);
+
+  // Re-acquire the live object-scan camera whenever the user reassigns it in
+  // the settings sidebar (only if the camera is currently running).
+  const prevObjectCameraIdRef = useRef(camera.objectCameraId);
+  useEffect(() => {
+    if (prevObjectCameraIdRef.current !== camera.objectCameraId) {
+      prevObjectCameraIdRef.current = camera.objectCameraId;
+      if (camera.isCameraOn) {
+        void camera.restartObjectCamera();
+      }
+    }
+  }, [camera.objectCameraId, camera.isCameraOn, camera]);
+
 
   if (showIntro) {
     return <IntroVideo onComplete={() => setShowIntro(false)} />;
@@ -741,8 +1006,52 @@ function App() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-300">LATENCY</span>
-                <span className="text-primary">{isConnected ? "24ms" : "--"}</span>
+                <span className={network.strength === "offline" ? "text-red-500" : "text-primary"}>
+                  {isConnected
+                    ? network.latencyMs !== null
+                      ? `${network.latencyMs}ms`
+                      : network.online
+                        ? "measuring…"
+                        : "offline"
+                    : "--"}
+                </span>
               </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 flex items-center gap-1">
+                  {network.strength === "offline"
+                    ? <WifiOff size={10} />
+                    : <Wifi size={10} />}
+                  CONNECTION
+                </span>
+                <span className={`font-extrabold flex items-center gap-2 ${strengthMeta.color}`}>
+                  {/* 4-bar signal-strength meter */}
+                  <span className="flex items-end gap-0.5 h-3">
+                    {[1, 2, 3, 4].map((bar) => (
+                      <span
+                        key={bar}
+                        className={`w-0.5 rounded-sm ${
+                          isConnected && bar <= strengthMeta.bars
+                            ? "bg-current"
+                            : "bg-current opacity-25"
+                        }`}
+                        style={{ height: `${bar * 3}px` }}
+                      />
+                    ))}
+                  </span>
+                  {isConnected ? strengthMeta.label : "--"}
+                </span>
+              </div>
+              {isConnected && network.effectiveType && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300">NETWORK</span>
+                  <span className="text-gray-200 uppercase">
+                    {network.effectiveType}
+                    {network.downlinkMbps !== null
+                      ? ` · ${network.downlinkMbps} Mbps`
+                      : ""}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-300">VOICE_ID</span>
                 <span className="text-gray-200">FLARE_V2</span>
@@ -854,10 +1163,65 @@ function App() {
           onFocus={imageGen.focusWindow}
           onPositionChange={imageGen.updateWindowPosition}
         />
+
+        {/* Floating 3D object viewer windows (from camera → 3D scans) */}
+        <ObjectViewerManager
+          visible={!isUiHidden}
+          windows={objectScan.windows}
+          onClose={objectScan.closeWindow}
+          onFocus={objectScan.focusWindow}
+          onPositionChange={objectScan.updateWindowPosition}
+        />
+
+        {/* Map popup (location / distance lookups) */}
+        <MapPopup visible={!isUiHidden} popup={mapPopup.popup} onClose={mapPopup.close} />
+
+        {/* Interactive face-analysis popup (age / gender / color analysis) */}
+        <FaceAnalysisPopup
+          visible={!isUiHidden}
+          isOpen={faceAnalysis.isOpen}
+          isAnalyzing={faceAnalysis.isAnalyzing}
+          isPreviewing={faceAnalysis.isPreviewing}
+          previewStream={faceAnalysis.previewStream}
+          capturedDataUrl={faceAnalysis.capturedDataUrl}
+          result={faceAnalysis.result}
+          error={faceAnalysis.error}
+          onClose={faceAnalysis.close}
+        />
+
+
+
       </div>
 
-      {/* Interrupt mode toggle */}
-      <div className="fixed bottom-4 left-4 md:bottom-8 md:left-8 z-50 pointer-events-auto">
+      {/* Multi-camera settings sidebar (toggle: A key or gear icon) */}
+      <SettingsSidebar
+        isOpen={isSettingsOpen}
+        devices={camera.devices}
+        objectCameraId={camera.objectCameraId}
+        faceCameraId={camera.faceCameraId}
+        onObjectCameraChange={camera.setObjectCameraId}
+        onFaceCameraChange={camera.setFaceCameraId}
+        onRefreshDevices={camera.refreshDevices}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* Bottom-left cluster: settings gear + interrupt mode toggle */}
+      <div className="fixed bottom-4 left-4 md:bottom-8 md:left-8 z-50 pointer-events-auto flex items-center gap-2">
+        {/* Settings gear (opens the multi-camera sidebar) */}
+        <button
+          onClick={() => setIsSettingsOpen((prev) => !prev)}
+          title="Camera settings (A)"
+          className={`group flex items-center justify-center w-10 h-10 glass-panel rounded-full border transition-all duration-300 focus:outline-none ${
+            isSettingsOpen
+              ? "border-primary text-primary shadow-[0_0_15px_rgba(0,238,255,0.3)]"
+              : "border-gray-600 text-gray-400 hover:border-primary/50 hover:text-primary/70"
+          }`}
+        >
+          <Settings size={16} className={`transition-transform duration-300 ${isSettingsOpen ? "rotate-90" : ""}`} />
+
+        </button>
+
+        {/* Interrupt mode toggle */}
         <button
           onClick={() => setInterruptEnabled((prev) => !prev)}
           title="Toggle interrupt mode (O)"
@@ -873,6 +1237,7 @@ function App() {
           </span>
         </button>
       </div>
+
 
       {/* Version badge */}
       <div className="fixed bottom-2 right-3 z-50 font-mono text-[10px] text-primary/30 select-none pointer-events-none tracking-widest">

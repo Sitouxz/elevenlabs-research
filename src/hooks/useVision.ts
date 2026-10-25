@@ -16,7 +16,7 @@ const VISION_BASE_URL =
     "https://api.groq.com/openai/v1";
 const VISION_MODEL =
     import.meta.env.VITE_VISION_MODEL ||
-    "meta-llama/llama-4-scout-17b-16e-instruct";
+    "qwen/qwen3.6-27b";
 
 export { VISION_API_KEY, VISION_BASE_URL, VISION_MODEL };
 
@@ -24,8 +24,8 @@ const DEFAULT_INTERVAL_MS = 10_000; // 10s between analyses
 const MAX_BACKOFF_MS = 120_000;
 
 const VISION_PROMPT =
-    "You are an AI vision system feeding real-time descriptions to a voice " +
-    "assistant called Flare.\n\n" +
+    "You are an AI vision system feeding real-time object descriptions into " +
+    "another program.\n\n" +
     "There is a plain white rectangular sheet of paper/box on the surface. " +
     "Your task: identify and describe ONLY the object(s) physically resting " +
     "INSIDE the boundaries of that white rectangle. " +
@@ -38,6 +38,7 @@ const VISION_PROMPT =
     "- Do NOT describe the background, floor, table, projected overlay, UI elements, or anything outside the white rectangle.\n" +
     "- Do NOT describe or mention the white rectangle itself in your response.\n" +
     "- Do NOT use phrases like 'on the white box', 'on the white paper', 'on the white area', etc.\n" +
+    "- Do NOT address, greet, or mention any name (e.g. 'Flare') — output only the object description itself.\n" +
     "- If nothing is inside the white rectangle, respond only: 'No object detected.'\n\n" +
     "Keep the description under 3 sentences. Be specific and factual. " +
     'Do NOT say "I see an image" or "This is a photo" — describe directly as if looking through a camera in real time.';

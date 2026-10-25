@@ -116,8 +116,8 @@ This tool unmutes the microphone unconditionally — when invoked while already 
 | Name | `compute` |
 | Description | `Perform precise counting, arithmetic, dates/ages, word indexing, and string manipulation. Call this whenever the user asks for exact counts, ages, word positions, reversing strings, scrambling words, swapping characters (e.g. "reverse the N and F"), or string transforms instead of guessing.` |
 | Wait for response | ✅ ON (timeout 5s) |
-| Parameters | `task` (string, required) — `One of: age, count_occurrences, count_words, nth_word, reverse_without_vowels, scramble, swap_chars, arithmetic.` |
-| | `text` (string, optional) — `Text to operate on. Required for count_occurrences, count_words, nth_word, reverse_without_vowels, scramble, swap_chars.` |
+| Parameters | `task` (string, required) — `One of: age, count_occurrences, count_words, nth_word, reverse, reverse_without_vowels, scramble, swap_chars, arithmetic, date_offset. Use reverse to flip a string back-to-front keeping all letters; only use reverse_without_vowels when the user explicitly wants vowels dropped.` |
+| | `text` (string, optional) — `Text to operate on. Required for count_occurrences, count_words, nth_word, reverse, reverse_without_vowels, scramble, swap_chars.` |
 | | `substring` (string, optional) — `Substring to count. Required for count_occurrences.` |
 | | `n` (integer, optional) — `Word index (1-based). Required for nth_word.` |
 | | `birth_year` (integer, optional) — `Required for age.` |
@@ -126,12 +126,63 @@ This tool unmutes the microphone unconditionally — when invoked while already 
 | | `case_sensitive` (boolean, optional) — `If true, count_occurrences is case-sensitive. Defaults to false.` |
 | | `char_a` (string, optional) — `Single character to swap. Required for swap_chars.` |
 | | `char_b` (string, optional) — `Single character to swap. Required for swap_chars.` |
+| | `from` (string, optional) — `Base date as YYYY-MM-DD. Defaults to today. Used by date_offset.` |
+| | `offset_days` (integer, optional) — `Number of days to add (negative to subtract). Required for date_offset.` |
 
 The compute tool fixes systematic off-by-one errors in counting, math, and indexing because the browser performs the calculation rather than the model estimating it.
 
 The manual prompt input works without this configuration.
 
+**Tool 7 — `check_weather`**
+
+| Field | Value |
+| --- | --- |
+| Name | `check_weather` |
+| Description | `Check the current weather at the user's location. Call this whenever the user asks about the weather, temperature, or outdoor conditions where they are. Always call the tool — never claim you lack location or weather access.` |
+| Wait for response | ✅ ON (timeout 10s) |
+| Parameters | none |
+
+Uses the browser's Geolocation API (prompts the user for permission on first call) plus [Open-Meteo](https://open-meteo.com) for current conditions and [BigDataCloud](https://www.bigdatacloud.com/geocoding-apis/free-reverse-geocode-to-city-api) for the place name — both free, keyless APIs, so no `VITE_` env var is needed. If the user denies location permission, the tool returns a message asking them to allow it.
+
+**Tool 8 — `show_map`**
+
+| Field | Value |
+| --- | --- |
+| Name | `show_map` |
+| Description | `Show a place on a map, or the distance between two places. Call this whenever the user asks where a location is, wants to see it on a map, or asks the distance/how far apart two places are.` |
+| Wait for response | ✅ ON (timeout 10s) |
+| Parameters | `location` (string, required) — `The place to look up (or the origin, when destination is also given).` |
+| | `destination` (string, optional) — `A second place. Provide this only when the user asks for the distance between two locations.` |
+
+Opens a floating popup with an embedded [OpenStreetMap](https://www.openstreetmap.org) view. Geocoding is done via [Nominatim](https://nominatim.org) (free, keyless); distance is a straight-line (haversine) calculation, not a driving route. Both are free, keyless APIs, so no `VITE_` env var is needed.
+
+**Tool 9 — `scan_to_3d`**
+
+| Field | Value |
+| --- | --- |
+| Name | `scan_to_3d` |
+| Description | `Capture the object in front of the live camera and build an interactive 3D model of it. Call this whenever the user asks to scan a real object into 3D, recreate it in 3D, or 'turn this into a 3D model'. It auto-turns the camera on. Generation runs in the background for a few minutes; the tool returns immediately with a status message. Always call the tool — never refuse.` |
+| Wait for response | ✅ ON (timeout 15s) |
+| Parameters | `object_name` (string, optional) — `The short name of the object being scanned, if the user named it (e.g. "controller").` |
+
+Captures a camera frame, POSTs it to the Tripo image-to-3D webhook, then polls for the finished `.glb` and shows it in a draggable viewer window. Requires the camera; use this only when the user wants to scan a **real** object.
+
+**Tool 10 — `generate_3d`**
+
+| Field | Value |
+| --- | --- |
+| Name | `generate_3d` |
+| Description | `Generate an interactive 3D model purely from a text description — no camera or image needed. Call this whenever the user asks to generate/make/create/build a 3D object or model of something they describe in words (e.g. "generate a 3D of a plane", "make a 3D model of a mouse"). Do NOT turn the camera on. Generation runs in the background for a few minutes; the tool returns immediately with a status message. Always call the tool — never refuse.` |
+| Wait for response | ✅ ON (timeout 15s) |
+| Parameters | `prompt` (string, required) — `A detailed description of the object to build in 3D (e.g. "a commercial passenger airplane").` |
+| | `object_name` (string, optional) — `A short name for the object, if the user named it (e.g. "plane").` |
+
+Sends the prompt to the Tripo text-to-3D webhook (`generate-3d-tripo-text`), polls for the finished `.glb`, and shows it in the same draggable viewer window as the camera scan. Use this (not `scan_to_3d`) when the user only **describes** what they want.
+
+> **Important:** If Flare says *"I wasn't able to create the 3D object"* it almost always means this tool isn't declared on the dashboard yet — the browser-side handler exists, but the agent can only trigger a client tool that is also declared here. Add the tool exactly as above and reconnect.
+
 ## Production deployment
+
 
 The Vite dev proxy only runs in development. For production you must:
 

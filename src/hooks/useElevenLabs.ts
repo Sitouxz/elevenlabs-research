@@ -203,13 +203,15 @@ export const useElevenLabs = (agentId: string) => {
                 },
                 onMessage: (message: any) => {
                     if (message.message) {
-                        setMessages((prev) => [
-                            ...prev,
-                            {
-                                role: message.source === "ai" ? "ai" : "user",
-                                text: message.message,
-                            },
-                        ]);
+                        const role = message.source === "ai" ? "ai" : "user";
+                        // ponytail: strip v3 audio-direction tags (e.g. [happy], [slow]) from
+                        // AI transcript text so they don't leak into the UI; TTS still gets the
+                        // untouched original since audio is a separate stream from this event.
+                        const text =
+                            role === "ai"
+                                ? message.message.replace(/\s*\[[a-zA-Z_ ]+\]\s*/g, " ").trim()
+                                : message.message;
+                        setMessages((prev) => [...prev, { role, text }]);
                     }
                 },
                 onError: (error: any) => {
@@ -265,6 +267,32 @@ export const useElevenLabs = (agentId: string) => {
         }
     }, []);
 
+    // Unlike sendContextualUpdate (silent background context the agent only
+    // uses on its NEXT user-driven turn), sendUserMessage injects a message as
+    // if the user said it — which TRIGGERS an immediate agent response. Used to
+    // make the agent actually speak the result of a long-running background task
+    // (e.g. the face-analysis summary) the moment it resolves.
+    const sendUserMessage = useCallback((text: string) => {
+        if (!isConnectedRef.current || !conversationRef.current) {
+            console.warn(
+                "[useElevenLabs] sendUserMessage SKIPPED — no active session " +
+                `(isConnected=${isConnectedRef.current}, hasConversation=${!!conversationRef.current}). ` +
+                "The agent can only speak while a voice session is running.",
+            );
+            return;
+        }
+        try {
+            console.log(
+                "[useElevenLabs] sendUserMessage →",
+                text.slice(0, 120) + (text.length > 120 ? "…" : ""),
+            );
+            conversationRef.current.sendUserMessage(text);
+        } catch (err) {
+            console.warn("[useElevenLabs] sendUserMessage failed:", err);
+        }
+    }, []);
+
+
     // Send a user-activity heartbeat every 30 seconds while connected so the
     // ElevenLabs server-side inactivity timer never fires during silence.
     useEffect(() => {
@@ -298,6 +326,9 @@ export const useElevenLabs = (agentId: string) => {
         setGateMuted,
         interrupt,
         sendContextualUpdate,
+        sendUserMessage,
         registerClientTools,
     };
 };
+
+
