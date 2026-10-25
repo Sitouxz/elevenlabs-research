@@ -23,6 +23,8 @@ export type WorkerToMain =
           /** null when no hand is visible. */
           data: Float32Array | null;
           inferMs: number;
+          /** Diagnostics: which detection path produced this result. */
+          via?: "roi" | "full" | "tile" | "none";
       };
 
 /** Per-frame timing, delivered whether or not a hand was found. */

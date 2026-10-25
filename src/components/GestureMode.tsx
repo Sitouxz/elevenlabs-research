@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { VIDEO_ZOOM } from "../gesture/config";
 import { GestureEngine } from "../gesture/GestureEngine";
 import { HandTracker } from "../gesture/HandTracker";
 import type { Delegate, GestureStats, Pose } from "../gesture/types";
@@ -101,7 +100,7 @@ export const GestureMode = ({ stream, cameraError, onExit }: GestureModeProps) =
             try {
                 // Constructing these can throw on unsupported browsers (no
                 // module workers / 2D canvas); report it instead of crashing.
-                const e = new GestureEngine(canvas, {
+                const e = new GestureEngine(canvas, video, {
                     onPose: setPose,
                     onStats: setStats,
                     onExitRequested: () => onExitRef.current(),
@@ -173,11 +172,10 @@ export const GestureMode = ({ stream, cameraError, onExit }: GestureModeProps) =
                 muted
                 disablePictureInPicture
                 aria-hidden="true"
-                className="fixed inset-0 w-full h-full object-cover pointer-events-none"
-                style={{
-                    zIndex: 5,
-                    transform: `scaleX(-1) scale(${VIDEO_ZOOM})`,
-                }}
+                // Size and position are set by the engine from the same mapping it
+                // uses for the cursor, so the image and the skeleton always agree.
+                className="fixed max-w-none pointer-events-none"
+                style={{ zIndex: 5, transform: "scaleX(-1)", objectFit: "fill" }}
             />
             {/* Keeps the app's text legible over a busy camera image. */}
             <div

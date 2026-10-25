@@ -110,6 +110,14 @@ You can also exit with the **Exit** button or `Esc`. Gesture mode cannot type: u
 - The camera is requested at 60 fps (ideal), the model is preloaded when the button is hovered or focused, and `backdrop-filter` is disabled in gesture mode (re-blurring live video every frame costs latency).
 - The stats chip in the HUD shows FPS and camera-to-cursor latency; hover it for model inference time.
 
+### Detection and click reliability
+
+- **Small/distant hands:** the palm detector only sees a 192 px image, so a hand under ~25% of the frame height is invisible to a plain full-frame pass. When no hand is found the worker scans zoomed square tiles (one per frame), then follows the hand with a zoomed crop until it is large enough for normal tracking. Measured on real photos pasted at decreasing size: found down to ~9-13% of frame height.
+- **Reach:** only the central ~80% of the camera frame, near its top, is mapped onto the screen (the backdrop shows the same region). The hand no longer has to leave the frame to reach a screen edge, and pointing at the bottom dock keeps the wrist in view.
+- **Pinch signal:** thumb-index distance in the image plane over a foreshortening-robust hand size (real pinches read 0.05-0.25, open hands ~0.9), with the noisy 3D estimate used only to veto depth overlap. A pinch held with the other fingers curled is a pinch, not a fist; the exit fist needs all four fingers tightly curled.
+- **Click assist:** a slow cursor near a control snaps to it and stays until clearly pulled away; a ring around the cursor fills as thumb and index close, so you can see a click coming.
+- **Dropouts:** lower confidence floors (0.35) and a 300 ms grace period keep a pinch or drag alive through the brief tracking losses that happen when fingers occlude each other.
+
 All thresholds live in `src/gesture/config.ts`. They were checked against real hand photos and synthetic landmark streams, but tune them on your own hand and camera if a gesture misfires.
 
 ## Production deployment

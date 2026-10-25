@@ -1,9 +1,14 @@
 import {
     FINGER_CURLED,
     FINGER_EXTENDED,
+    FIST_CURL,
+    PINCH_DEPTH_VETO,
     PINCH_OFF,
     PINCH_OFF_HARD,
     PINCH_ON,
+    REGION_MAX_HEIGHT,
+    REGION_TOP,
+    REGION_WIDTH,
 } from "./config";
 
 // MediaPipe hand landmark indices.
@@ -38,13 +43,14 @@ const dist = (p: Float32Array, a: number, b: number): number => {
 };
 
 export interface HandFeatures {
-    /** thumb-index distance / palm size. */
+    /** thumb-index distance / hand size (image plane, depth-vetoed). */
     pinchRatio: number;
     indexExtended: boolean;
     middleExtended: boolean;
     ringCurled: boolean;
     pinkyCurled: boolean;
-    allCurled: boolean;
+    /** All four fingers tightly curled. */
+    fist: boolean;
 }
 
 const extension = (w: Float32Array, tip: number, mcp: number): number => {
@@ -52,10 +58,37 @@ const extension = (w: Float32Array, tip: number, mcp: number): number => {
     return base > 1e-6 ? dist(w, tip, WRIST) / base : 0;
 };
 
-/** `world` is the 21*3 metric landmark block. */
-export const computeFeatures = (world: Float32Array): HandFeatures => {
-    const palm = dist(world, WRIST, MIDDLE_MCP);
-    const pinchRatio = palm > 1e-6 ? dist(world, THUMB_TIP, INDEX_TIP) / palm : 1;
+/** Pixel-space distance between two image landmarks (x,y are 0..1 per axis). */
+const dist2d = (
+    p: Float32Array,
+    a: number,
+    b: number,
+    vw: number,
+    vh: number
+): number => Math.hypot((p[a * 3] - p[b * 3]) * vw, (p[a * 3 + 1] - p[b * 3 + 1]) * vh);
+
+/**
+ * `world` is the metric landmark block, `image` the normalised one; vw/vh are
+ * the camera frame size in pixels (x and y are normalised separately).
+ */
+export const computeFeatures = (
+    world: Float32Array,
+    image: Float32Array,
+    vw: number,
+    vh: number
+): HandFeatures => {
+    // Hand size that survives foreshortening: pointing the palm at the camera
+    // collapses wrist->knuckle, but the knuckle row keeps its width.
+    const size = Math.max(
+        dist2d(image, WRIST, MIDDLE_MCP, vw, vh),
+        1.25 * dist2d(image, INDEX_MCP, PINKY_MCP, vw, vh),
+        1.05 * dist2d(image, WRIST, INDEX_MCP, vw, vh)
+    );
+    const ratio2d = size > 1e-6 ? dist2d(image, THUMB_TIP, INDEX_TIP, vw, vh) / size : 1;
+
+    const palm3d = dist(world, WRIST, MIDDLE_MCP);
+    const ratio3d = palm3d > 1e-6 ? dist(world, THUMB_TIP, INDEX_TIP) / palm3d : 1;
+    const pinchRatio = ratio3d > PINCH_DEPTH_VETO ? ratio3d : ratio2d;
 
     const index = extension(world, INDEX_TIP, INDEX_MCP);
     const middle = extension(world, MIDDLE_TIP, MIDDLE_MCP);
@@ -68,14 +101,13 @@ export const computeFeatures = (world: Float32Array): HandFeatures => {
         middleExtended: middle > FINGER_EXTENDED,
         ringCurled: ring < FINGER_CURLED,
         pinkyCurled: pinky < FINGER_CURLED,
-        allCurled:
-            index < FINGER_CURLED &&
-            middle < FINGER_CURLED &&
-            ring < FINGER_CURLED &&
-            pinky < FINGER_CURLED,
+        fist:
+            index < FIST_CURL &&
+            middle < FIST_CURL &&
+            ring < FIST_CURL &&
+            pinky < FIST_CURL,
     };
 };
-
 /**
  * Pinch with hysteresis. `aboveOffFrames` counts consecutive frames over the
  * release threshold: release is debounced by one frame unless the fingers are
@@ -84,12 +116,12 @@ export const computeFeatures = (world: Float32Array): HandFeatures => {
 export const nextPinch = (
     wasPinching: boolean,
     ratio: number,
-    allCurled: boolean,
+    fist: boolean,
     aboveOffFrames: number
 ): { pinching: boolean; aboveOffFrames: number } => {
     if (!wasPinching) {
         // A fist wraps the thumb against the index finger: not a pinch.
-        return { pinching: ratio < PINCH_ON && !allCurled, aboveOffFrames: 0 };
+        return { pinching: ratio < PINCH_ON && !fist, aboveOffFrames: 0 };
     }
     if (ratio >= PINCH_OFF_HARD) return { pinching: false, aboveOffFrames: 0 };
     if (ratio >= PINCH_OFF) {
@@ -99,47 +131,51 @@ export const nextPinch = (
     return { pinching: true, aboveOffFrames: 0 };
 };
 
-/** Maps normalised camera coordinates to viewport pixels. */
+export interface VideoLayout {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+}
+
+/**
+ * Maps normalised camera coordinates to viewport pixels through the mapped
+ * region (see REGION_* in config). The backdrop <video> is laid out with the
+ * same numbers, so the skeleton always sits exactly on the hand in the image.
+ */
 export class ViewMapper {
-    private vw = 1;
-    private vh = 1;
+    private scale = 1;
+    private x0 = 0;
+    private y0 = 0;
     private videoW = 640;
     private videoH = 480;
-    private zoom = 1;
-    private dispW = 1;
-    private dispH = 1;
+    layout: VideoLayout = { left: 0, top: 0, width: 640, height: 480 };
 
-    configure(
-        vw: number,
-        vh: number,
-        videoW: number,
-        videoH: number,
-        zoom: number
-    ): void {
-        this.vw = vw;
-        this.vh = vh;
+    configure(vw: number, vh: number, videoW: number, videoH: number): void {
         this.videoW = videoW || 640;
         this.videoH = videoH || 480;
-        this.zoom = zoom;
-        // Mirrors `object-fit: cover` + CSS scale(zoom) on the <video>.
-        const scale = Math.max(vw / this.videoW, vh / this.videoH);
-        this.dispW = this.videoW * scale * zoom;
-        this.dispH = this.videoH * scale * zoom;
+        let regW = REGION_WIDTH * this.videoW;
+        let regH = (regW * vh) / vw;
+        const maxH = REGION_MAX_HEIGHT * this.videoH;
+        if (regH > maxH) {
+            regH = maxH;
+            regW = (regH * vw) / vh;
+        }
+        this.x0 = (this.videoW - regW) / 2;
+        this.y0 = Math.min(REGION_TOP * this.videoH, this.videoH - regH);
+        this.scale = vw / regW;
+        this.layout = {
+            // Laid out in mirrored space (the element itself is flipped).
+            left: -this.x0 * this.scale,
+            top: -this.y0 * this.scale,
+            width: this.videoW * this.scale,
+            height: this.videoH * this.scale,
+        };
     }
 
     /** Camera is shown mirrored, so x is flipped. Writes into `out[offset]`. */
     map(nx: number, ny: number, out: Float32Array, offset: number): void {
-        out[offset] = this.vw / 2 + (0.5 - nx) * this.dispW;
-        out[offset + 1] = this.vh / 2 + (ny - 0.5) * this.dispH;
-    }
-
-    get viewportWidth(): number {
-        return this.vw;
-    }
-    get viewportHeight(): number {
-        return this.vh;
-    }
-    get videoZoom(): number {
-        return this.zoom;
+        out[offset] = ((1 - nx) * this.videoW - this.x0) * this.scale;
+        out[offset + 1] = (ny * this.videoH - this.y0) * this.scale;
     }
 }

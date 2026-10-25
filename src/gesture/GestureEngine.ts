@@ -7,9 +7,10 @@ import {
     LEAD_SECONDS,
     LOST_GRACE_MS,
     PINCH_ANCHOR_LOOKBACK_MS,
+    PINCH_HINT_START,
+    PINCH_ON,
     POSE_STABLE_FRAMES,
     SCROLL_GAIN,
-    VIDEO_ZOOM,
 } from "./config";
 import { DomPointer } from "./DomPointer";
 import {
@@ -23,6 +24,7 @@ import {
     nextPinch,
 } from "./handMath";
 import { OneEuroFilter2D } from "./oneEuro";
+import { TargetSnap } from "./TargetSnap";
 import {
     LANDMARK_COUNT,
     type FrameMeta,
@@ -52,6 +54,9 @@ export class GestureEngine {
     private readonly cb: EngineCallbacks;
     private readonly mapper = new ViewMapper();
     private readonly pointer = new DomPointer();
+    private readonly snapper = new TargetSnap();
+    private readonly snapOut = { x: 0, y: 0 };
+    private readonly video: HTMLVideoElement;
 
     private readonly opts = {
         minCutoff: FILTER_MIN_CUTOFF,
@@ -88,6 +93,8 @@ export class GestureEngine {
     private anchorRefY = 0;
     private cursorX = 0;
     private cursorY = 0;
+    private snapped = false;
+    private pinchRatio = 1;
 
     private pose: Pose = "none";
     private candidate: Pose = "none";
@@ -109,8 +116,13 @@ export class GestureEngine {
 
     private disposed = false;
 
-    constructor(canvas: HTMLCanvasElement, callbacks: EngineCallbacks) {
+    constructor(
+        canvas: HTMLCanvasElement,
+        video: HTMLVideoElement,
+        callbacks: EngineCallbacks
+    ) {
         this.canvas = canvas;
+        this.video = video;
         this.cb = callbacks;
         // `desynchronized` lets the browser skip compositor sync for the
         // canvas: lower cursor latency where the platform supports it.
@@ -137,13 +149,15 @@ export class GestureEngine {
         this.canvas.style.width = `${this.width}px`;
         this.canvas.style.height = `${this.height}px`;
         this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        this.mapper.configure(
-            this.width,
-            this.height,
-            this.videoW,
-            this.videoH,
-            VIDEO_ZOOM
-        );
+        this.mapper.configure(this.width, this.height, this.videoW, this.videoH);
+        // The backdrop shares the mapper's numbers, so skeleton and image agree.
+        const { left, top, width, height } = this.mapper.layout;
+        const s = this.video.style;
+        s.left = `${left}px`;
+        s.top = `${top}px`;
+        s.width = `${width}px`;
+        s.height = `${height}px`;
+        this.snapper.invalidate();
     }
 
     /** `hand` is null when the tracker saw no hand in this frame. */
@@ -175,15 +189,16 @@ export class GestureEngine {
         this.refFilter.update(refX, refY, t);
 
         // 3. Pose.
-        const f = computeFeatures(world);
+        const f = computeFeatures(world, image, this.videoW, this.videoH);
+        this.pinchRatio = f.pinchRatio;
         const wasPinching = this.pinching;
-        const p = nextPinch(wasPinching, f.pinchRatio, f.allCurled, this.aboveOffFrames);
+        const p = nextPinch(wasPinching, f.pinchRatio, f.fist, this.aboveOffFrames);
         this.pinching = p.pinching;
         this.aboveOffFrames = p.aboveOffFrames;
 
         let raw: Pose = "point";
         if (this.pinching) raw = "pinch";
-        else if (f.allCurled) raw = "fist";
+        else if (f.fist) raw = "fist";
         else if (f.indexExtended && f.middleExtended && f.ringCurled && f.pinkyCurled) {
             raw = "scroll";
         }
@@ -277,10 +292,20 @@ export class GestureEngine {
 
     private updatePointCursor(t: number): void {
         const f = this.tipFilter;
-        this.record(t, f.x, f.y, this.refFilter.x, this.refFilter.y);
         const lead = this.lead(f.vx, f.vy);
-        this.cursorX = f.x + lead.x;
-        this.cursorY = f.y + lead.y;
+        const out = this.snapOut;
+        this.snapped = this.snapper.snap(
+            f.x + lead.x,
+            f.y + lead.y,
+            Math.hypot(f.vx, f.vy),
+            t,
+            out
+        );
+        this.cursorX = out.x;
+        this.cursorY = out.y;
+        // History holds where the cursor was actually shown, so a pinch that
+        // starts a moment later lands on whatever the user was looking at.
+        this.record(t, out.x, out.y, this.refFilter.x, this.refFilter.y);
     }
 
     private beginPinch(t: number): void {
@@ -294,6 +319,8 @@ export class GestureEngine {
         this.anchorRefY = anchor.ry;
         this.scrolling = false;
         this.overInteractive = true;
+        this.snapped = false;
+        this.snapper.reset();
         this.updatePinchCursor();
         this.pointer.press(this.cursorX, this.cursorY);
     }
@@ -376,6 +403,9 @@ export class GestureEngine {
         this.histHead = 0;
         this.fistSince = 0;
         this.exitFired = false;
+        this.snapper.reset();
+        this.snapped = false;
+        this.pinchRatio = 1;
         this.candidate = "none";
         this.candidateFrames = 0;
         if (this.pose !== "none") {
@@ -440,6 +470,13 @@ export class GestureEngine {
             return;
         }
         const radius = this.overInteractive ? 20 : 13;
+        if (this.snapped) {
+            // Locked onto a control: a soft disc says "this will be clicked".
+            ctx.fillStyle = `rgba(${PRIMARY},0.2)`;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
         ctx.lineWidth = 2.5;
         ctx.strokeStyle = this.overInteractive
             ? `rgba(${PRIMARY},1)`
@@ -451,6 +488,21 @@ export class GestureEngine {
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();
+
+        // Pinch progress: the ring fills as thumb and index close, so you can
+        // see how far you are from a click before it happens.
+        if (this.pose === "point" && this.pinchRatio < PINCH_HINT_START) {
+            const progress = Math.min(
+                (PINCH_HINT_START - this.pinchRatio) / (PINCH_HINT_START - PINCH_ON),
+                1
+            );
+            ctx.lineWidth = 4;
+            ctx.lineCap = "round";
+            ctx.strokeStyle = progress >= 1 ? "rgba(255,255,255,1)" : `rgba(${PRIMARY},0.95)`;
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 8, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+            ctx.stroke();
+        }
 
         if (this.pose === "scroll") {
             ctx.strokeStyle = `rgba(${PRIMARY},0.9)`;
