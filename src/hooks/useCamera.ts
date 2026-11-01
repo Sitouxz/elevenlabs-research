@@ -27,6 +27,7 @@ const writeStored = (key: string, value: string) => {
 export const useCamera = () => {
     const [isCameraOn, setIsCameraOn] = useState(false);
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const [cameraError, setCameraError] = useState("");
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -128,6 +129,7 @@ export const useCamera = () => {
                 stream = await openStreamForDevice(undefined);
             }
 
+            setCameraError("");
             setCameraStream(stream);
             setIsCameraOn(true);
 
@@ -141,6 +143,9 @@ export const useCamera = () => {
             refreshDevices();
         } catch (error) {
             console.error("Failed to start camera:", error);
+            setCameraError(
+                error instanceof Error ? error.message : "Camera unavailable"
+            );
         }
     }, [openStreamForDevice, refreshDevices]);
 
@@ -195,6 +200,7 @@ export const useCamera = () => {
     return {
         isCameraOn,
         cameraStream,
+        cameraError,
         videoRef,
         startCamera,
         stopCamera,

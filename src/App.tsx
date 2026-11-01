@@ -7,6 +7,8 @@ import { CameraFeed } from "./components/CameraFeed";
 // import { ImageStudio } from "./components/ImageStudio";
 import { ImageWindowManager } from "./components/ImageWindowManager";
 import { ObjectViewerManager } from "./components/ObjectViewerManager";
+import { GestureMode } from "./components/GestureMode";
+import { HandTracker } from "./gesture/HandTracker";
 import { MapPopup } from "./components/MapPopup";
 import { SettingsSidebar } from "./components/SettingsSidebar";
 import { FaceAnalysisPopup } from "./components/FaceAnalysisPopup";
@@ -53,6 +55,9 @@ function App() {
   const processedMsgCountRef = useRef(0);
   const hasSentFirstScanRef = useRef(false);
   const [isUiHidden, setIsUiHidden] = useState(false);
+  const [isGestureActive, setIsGestureActive] = useState(false);
+  const cameraWasOnRef = useRef(false);
+  const gestureActiveRef = useRef(false);
   const [showIntro, setShowIntro] = useState(true);
   const [interruptEnabled, setInterruptEnabled] = useState(true);
 
@@ -787,6 +792,29 @@ function App() {
     await camera.toggleCamera();
   }, [camera]);
 
+  const handleStartGesture = useCallback(() => {
+    // Fullscreen needs this click's user activation, so request it before
+    // anything else runs. If it's denied, gesture mode still works windowed.
+    // (Missing entirely on iPhone Safari, hence the guard.)
+    const root = document.documentElement;
+    if (root.requestFullscreen) {
+      root.requestFullscreen({ navigationUI: "hide" }).catch(() => undefined);
+    }
+    cameraWasOnRef.current = camera.isCameraOn;
+    gestureActiveRef.current = true;
+    setIsGestureActive(true);
+    if (!camera.isCameraOn) void camera.startCamera();
+  }, [camera]);
+
+  const handleExitGesture = useCallback(() => {
+    // Esc, fullscreenchange, the Exit button and the fist gesture can all fire.
+    if (!gestureActiveRef.current) return;
+    gestureActiveRef.current = false;
+    setIsGestureActive(false);
+    // Leave the camera as we found it.
+    if (!cameraWasOnRef.current) camera.stopCamera();
+  }, [camera]);
+
   // When the user unmutes (button or keyboard), tell the agent it can hear again.
   // Otherwise the agent still thinks it's muted from the earlier mute_microphone
   // tool call and will respond with "I can't hear you, you're muted."
@@ -1130,6 +1158,8 @@ function App() {
               onToggleMute={toggleMute}
               onInterrupt={interrupt}
               onToggleCamera={handleToggleCamera}
+              onStartGesture={handleStartGesture}
+              onPreloadGesture={HandTracker.preload}
             />
           </div>
         </main>
@@ -1141,8 +1171,10 @@ function App() {
           </div>
         </footer>
 
-        {/* Floating draggable Vision Feed window (hidden on mobile) */}
-        <div className="hidden md:block">
+        {/* Floating draggable Vision Feed window (hidden on mobile). In gesture
+            mode the camera is already fullscreen, so hide it, but keep it
+            mounted: scan_camera reads frames from its <video>. */}
+        <div className={isGestureActive ? "invisible" : "hidden md:block"}>
           <CameraFeed
             visible={!isUiHidden}
             isCameraOn={camera.isCameraOn}
@@ -1192,6 +1224,14 @@ function App() {
 
 
       </div>
+
+      {isGestureActive && (
+        <GestureMode
+          stream={camera.cameraStream}
+          cameraError={camera.cameraError}
+          onExit={handleExitGesture}
+        />
+      )}
 
       {/* Multi-camera settings sidebar (toggle: A key or gear icon) */}
       <SettingsSidebar
