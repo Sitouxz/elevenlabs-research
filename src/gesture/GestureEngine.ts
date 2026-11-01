@@ -11,6 +11,8 @@ import {
     PINCH_ON,
     POSE_STABLE_FRAMES,
     SCROLL_GAIN,
+    SKELETON_BETA,
+    SKELETON_MIN_CUTOFF,
 } from "./config";
 import { DomPointer } from "./DomPointer";
 import {
@@ -69,7 +71,18 @@ export class GestureEngine {
     // moving in a pinch, which shifts that midpoint by tens of pixels).
     private readonly refFilter = new OneEuroFilter2D(this.opts);
 
+    // Raw landmarks drive all logic; `pts` is the smoothed copy that is drawn.
+    private readonly rawPts = new Float32Array(LANDMARK_COUNT * 2);
     private readonly pts = new Float32Array(LANDMARK_COUNT * 2);
+    private readonly skeleton = Array.from(
+        { length: LANDMARK_COUNT },
+        () =>
+            new OneEuroFilter2D({
+                minCutoff: SKELETON_MIN_CUTOFF,
+                beta: SKELETON_BETA,
+                dCutoff: FILTER_D_CUTOFF,
+            })
+    );
     // Ring buffer of displayed (pre-lead) cursor positions, for pinch anchoring.
     private readonly histT = new Float64Array(HISTORY);
     private readonly histX = new Float32Array(HISTORY);
@@ -174,13 +187,21 @@ export class GestureEngine {
 
         // 1. Landmarks -> viewport pixels (raw, unfiltered: used for the skeleton).
         const { image, world } = hand;
+        const rp = this.rawPts;
         for (let i = 0; i < LANDMARK_COUNT; i++) {
-            this.mapper.map(image[i * 3], image[i * 3 + 1], this.pts, i * 2);
+            this.mapper.map(image[i * 3], image[i * 3 + 1], rp, i * 2);
         }
-        const tipX = this.pts[INDEX_TIP * 2];
-        const tipY = this.pts[INDEX_TIP * 2 + 1];
-        const refX = (this.pts[INDEX_MCP * 2] + this.pts[MIDDLE_MCP * 2]) / 2;
-        const refY = (this.pts[INDEX_MCP * 2 + 1] + this.pts[MIDDLE_MCP * 2 + 1]) / 2;
+        const tipX = rp[INDEX_TIP * 2];
+        const tipY = rp[INDEX_TIP * 2 + 1];
+        const refX = (rp[INDEX_MCP * 2] + rp[MIDDLE_MCP * 2]) / 2;
+        const refY = (rp[INDEX_MCP * 2 + 1] + rp[MIDDLE_MCP * 2 + 1]) / 2;
+        // Smoothed copy for drawing only (the cursor has its own filters).
+        for (let i = 0; i < LANDMARK_COUNT; i++) {
+            const s = this.skeleton[i];
+            s.update(rp[i * 2], rp[i * 2 + 1], meta.captureTs);
+            this.pts[i * 2] = s.x;
+            this.pts[i * 2 + 1] = s.y;
+        }
 
         // 2. Smooth. Time base is camera capture time, not arrival time, so
         //    scheduling jitter in the pipeline doesn't pollute the velocity.
@@ -399,6 +420,7 @@ export class GestureEngine {
         this.pointer.reset();
         this.tipFilter.reset();
         this.refFilter.reset();
+        for (const s of this.skeleton) s.reset();
         this.histCount = 0;
         this.histHead = 0;
         this.fistSince = 0;

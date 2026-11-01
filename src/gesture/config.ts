@@ -102,3 +102,10 @@ export const TILE_SIZE = 0.62;
 export const ROI_PAD = 2.8;
 /** Hand taller than this (fraction of frame height): back to full-frame tracking. */
 export const ROI_TO_FULLFRAME = 0.3;
+/**
+ * Skeleton drawing smoothing. Heavier than the cursor filter: the cursor must
+ * stay snappy, but a drawn skeleton only has to look steady. At rest this
+ * removes the per-frame landmark noise; fast movement still passes through.
+ */
+export const SKELETON_MIN_CUTOFF = 0.8;
+export const SKELETON_BETA = 0.02;
