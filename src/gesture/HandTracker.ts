@@ -10,6 +10,10 @@ import {
 
 const IDLE_DISPOSE_MS = 60_000;
 const WATCHDOG_MS = 1000;
+// The app may open the camera at 1080p (object scanning wants that). The tracker
+// gains nothing from it: MediaPipe downsamples to a few hundred px, while a
+// full-size copy per frame costs real time. Downscale once, at capture.
+const TRACK_HEIGHT = 480;
 
 const assetUrl = (path: string): string =>
     new URL(`${import.meta.env.BASE_URL}${path}`, window.location.href).href;
@@ -195,7 +199,11 @@ export class HandTracker {
         // One conversion at a time; the next camera frame will come soon.
         if (this.preparing) return;
         this.preparing = true;
-        createImageBitmap(video)
+        const options: ImageBitmapOptions | undefined =
+            video.videoHeight > TRACK_HEIGHT
+                ? { resizeHeight: TRACK_HEIGHT, resizeQuality: "low" }
+                : undefined;
+        createImageBitmap(video, options)
             .then((image) => {
                 this.preparing = false;
                 this.accept(image, captureTs);

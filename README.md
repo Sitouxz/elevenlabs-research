@@ -1,6 +1,6 @@
-# JARVIS — Voice + Vision + Image & Video Generation
+# FLARE — Voice + Vision + Image & Video Generation
 
-A JARVIS-style multimodal AI assistant built on **ElevenLabs Conversational AI**, **Groq vision** (live camera understanding), and **Replicate** (image *and* video generation in draggable popup windows).
+A FLARE-style multimodal AI assistant built on **ElevenLabs Conversational AI**, **Groq vision** (live camera understanding), and **Replicate** (image *and* video generation in draggable popup windows).
 
 ## Stack
 
@@ -40,7 +40,7 @@ npm run dev
 ## Media generation feature
 
 - **Manual trigger** — type a prompt in the bottom-left **MEDIA STUDIO** dock, pick `Image` or `Video` from the toggle, and press Enter.
-- **Voice trigger** — say *"JARVIS, generate an image of a neon owl"* (`generate_image` tool) or *"render a video of a robot dancing"* (`generate_video` tool).
+- **Voice trigger** — say *"FLARE, generate an image of a neon owl"* (`generate_image` tool) or *"render a video of a robot dancing"* (`generate_video` tool).
 - **Multi-window** — each generation opens a draggable popup window in the center of the screen. Click to focus, drag the title bar to move, ✕ to close. Multiple windows stack like Windows windows.
 - **Image vs video windows** — image popups are square (`aspect-square`), video popups are 16:9 (`aspect-video`) with autoplay+loop+controls.
 - **History** — completed media appear in the dock as thumbnails (videos auto-loop with a play overlay). Click any thumbnail to re-open it in a new window.
@@ -52,7 +52,7 @@ The browser cannot call `api.replicate.com` directly (CORS-blocked). Vite's dev 
 
 ### Configuring the voice tools on the ElevenLabs agent dashboard
 
-For **voice triggers** to work, register two client tools on your agent at https://elevenlabs.io/app/conversational-ai → your agent → **Tools** → **Add tool** → **Client**:
+For **voice triggers** to work, register the client tools below on your agent at https://elevenlabs.io/app/conversational-ai → your agent → **Tools** → **Add tool** → **Client**:
 
 **Tool 1 — `generate_image`**
 
@@ -61,7 +61,11 @@ For **voice triggers** to work, register two client tools on your agent at https
 | Name | `generate_image` |
 | Description | `Generate an AI image and display it on screen. Call this whenever the user asks for an image, picture, drawing, or illustration. Always call the tool — never refuse.` |
 | Wait for response | ✅ ON (timeout 5s) |
-| Parameter | `prompt` (string, required) — `A detailed description of the image to generate.` |
+| Parameters | `prompt` (string, required) — `A detailed description of the image to generate.` |
+| | `use_last_image` (boolean, optional) — `Set true when the user is asking to modify, edit, or iterate on the image you just generated (e.g. "make it blue", "change the pillow to white"). Set false when the user explicitly wants something new/different/unrelated. Leave unset if unsure.` |
+| | `reference_image` (string, optional) — `An explicit image URL to use as a reference/edit target. Usually left unset — use use_last_image instead.` |
+
+Without `use_last_image` declared here, the agent can never pass it, so every edit request falls back to automatic recency + keyword detection in the app — which is less reliable for edits that reference something not named in the original prompt (e.g. "the pillow"). Adding this parameter lets the agent make the call explicitly.
 
 **Tool 2 — `generate_video`**
 
@@ -83,7 +87,99 @@ For **voice triggers** to work, register two client tools on your agent at https
 
 This tool takes no parameters — it captures the current camera frame, runs it through the vision model, and returns the description for the agent to read back. The camera must be turned on (via the on-screen control) for the scan to succeed.
 
+**Tool 4 — `mute_microphone`**
+
+| Field | Value |
+| --- | --- |
+| Name | `mute_microphone` |
+| Description | `Mute the user's microphone so the AI stops listening. Call this whenever the user asks to be muted, says 'mute me', 'mute myself', 'stop listening', 'don't listen', 'be quiet', 'stop talking', or indicates they want to talk to someone else privately and don't want the AI to hear.` |
+| Wait for response | ✅ ON (timeout 5s) |
+| Parameters | none |
+
+This tool mutes the microphone unconditionally — when invoked while already muted, it simply confirms the mic is already off (no toggle). The AI will tell the user how to unmute (say "unmute" or press the unmute button).
+
+**Tool 5 — `unmute_microphone`**
+
+| Field | Value |
+| --- | --- |
+| Name | `unmute_microphone` |
+| Description | `Unmute the user's microphone so the AI can hear again. Call this whenever the user asks to be unmuted, says 'unmute me', 'unmute myself', 'start listening', 'listen again', 'come back', 'I'm back', or indicates they want the AI to resume listening.` |
+| Wait for response | ✅ ON (timeout 5s) |
+| Parameters | none |
+
+This tool unmutes the microphone unconditionally — when invoked while already unmuted, it simply confirms the mic is already active (no toggle).
+
+**Tool 6 — `compute`**
+
+| Field | Value |
+| --- | --- |
+| Name | `compute` |
+| Description | `Perform precise counting, arithmetic, dates/ages, word indexing, and string manipulation. Call this whenever the user asks for exact counts, ages, word positions, reversing strings, scrambling words, swapping characters (e.g. "reverse the N and F"), or string transforms instead of guessing.` |
+| Wait for response | ✅ ON (timeout 5s) |
+| Parameters | `task` (string, required) — `One of: age, count_occurrences, count_words, nth_word, reverse, reverse_without_vowels, scramble, swap_chars, arithmetic, date_offset. Use reverse to flip a string back-to-front keeping all letters; only use reverse_without_vowels when the user explicitly wants vowels dropped.` |
+| | `text` (string, optional) — `Text to operate on. Required for count_occurrences, count_words, nth_word, reverse, reverse_without_vowels, scramble, swap_chars.` |
+| | `substring` (string, optional) — `Substring to count. Required for count_occurrences.` |
+| | `n` (integer, optional) — `Word index (1-based). Required for nth_word.` |
+| | `birth_year` (integer, optional) — `Required for age.` |
+| | `target_year` (integer, optional) — `Required for age.` |
+| | `expression` (string, optional) — `Arithmetic expression (e.g. "2027 - 1997"). Required for arithmetic.` |
+| | `case_sensitive` (boolean, optional) — `If true, count_occurrences is case-sensitive. Defaults to false.` |
+| | `char_a` (string, optional) — `Single character to swap. Required for swap_chars.` |
+| | `char_b` (string, optional) — `Single character to swap. Required for swap_chars.` |
+| | `from` (string, optional) — `Base date as YYYY-MM-DD. Defaults to today. Used by date_offset.` |
+| | `offset_days` (integer, optional) — `Number of days to add (negative to subtract). Required for date_offset.` |
+
+The compute tool fixes systematic off-by-one errors in counting, math, and indexing because the browser performs the calculation rather than the model estimating it.
+
 The manual prompt input works without this configuration.
+
+**Tool 7 — `check_weather`**
+
+| Field | Value |
+| --- | --- |
+| Name | `check_weather` |
+| Description | `Check the current weather at the user's location. Call this whenever the user asks about the weather, temperature, or outdoor conditions where they are. Always call the tool — never claim you lack location or weather access.` |
+| Wait for response | ✅ ON (timeout 10s) |
+| Parameters | none |
+
+Uses the browser's Geolocation API (prompts the user for permission on first call) plus [Open-Meteo](https://open-meteo.com) for current conditions and [BigDataCloud](https://www.bigdatacloud.com/geocoding-apis/free-reverse-geocode-to-city-api) for the place name — both free, keyless APIs, so no `VITE_` env var is needed. If the user denies location permission, the tool returns a message asking them to allow it.
+
+**Tool 8 — `show_map`**
+
+| Field | Value |
+| --- | --- |
+| Name | `show_map` |
+| Description | `Show a place on a map, or the distance between two places. Call this whenever the user asks where a location is, wants to see it on a map, or asks the distance/how far apart two places are.` |
+| Wait for response | ✅ ON (timeout 10s) |
+| Parameters | `location` (string, required) — `The place to look up (or the origin, when destination is also given).` |
+| | `destination` (string, optional) — `A second place. Provide this only when the user asks for the distance between two locations.` |
+
+Opens a floating popup with an embedded [OpenStreetMap](https://www.openstreetmap.org) view. Geocoding is done via [Nominatim](https://nominatim.org) (free, keyless); distance is a straight-line (haversine) calculation, not a driving route. Both are free, keyless APIs, so no `VITE_` env var is needed.
+
+**Tool 9 — `scan_to_3d`**
+
+| Field | Value |
+| --- | --- |
+| Name | `scan_to_3d` |
+| Description | `Capture the object in front of the live camera and build an interactive 3D model of it. Call this whenever the user asks to scan a real object into 3D, recreate it in 3D, or 'turn this into a 3D model'. It auto-turns the camera on. Generation runs in the background for a few minutes; the tool returns immediately with a status message. Always call the tool — never refuse.` |
+| Wait for response | ✅ ON (timeout 15s) |
+| Parameters | `object_name` (string, optional) — `The short name of the object being scanned, if the user named it (e.g. "controller").` |
+
+Captures a camera frame, POSTs it to the Tripo image-to-3D webhook, then polls for the finished `.glb` and shows it in a draggable viewer window. Requires the camera; use this only when the user wants to scan a **real** object.
+
+**Tool 10 — `generate_3d`**
+
+| Field | Value |
+| --- | --- |
+| Name | `generate_3d` |
+| Description | `Generate an interactive 3D model purely from a text description — no camera or image needed. Call this whenever the user asks to generate/make/create/build a 3D object or model of something they describe in words (e.g. "generate a 3D of a plane", "make a 3D model of a mouse"). Do NOT turn the camera on. Generation runs in the background for a few minutes; the tool returns immediately with a status message. Always call the tool — never refuse.` |
+| Wait for response | ✅ ON (timeout 15s) |
+| Parameters | `prompt` (string, required) — `A detailed description of the object to build in 3D (e.g. "a commercial passenger airplane").` |
+| | `object_name` (string, optional) — `A short name for the object, if the user named it (e.g. "plane").` |
+
+Sends the prompt to the Tripo text-to-3D webhook (`generate-3d-tripo-text`), polls for the finished `.glb`, and shows it in the same draggable viewer window as the camera scan. Use this (not `scan_to_3d`) when the user only **describes** what they want.
+
+> **Important:** If Flare says *"I wasn't able to create the 3D object"* it almost always means this tool isn't declared on the dashboard yet — the browser-side handler exists, but the agent can only trigger a client tool that is also declared here. Add the tool exactly as above and reconnect.
 
 ## Gesture control
 
@@ -121,6 +217,7 @@ You can also exit with the **Exit** button or `Esc`. Gesture mode cannot type: u
 All thresholds live in `src/gesture/config.ts`. They were checked against real hand photos and synthetic landmark streams, but tune them on your own hand and camera if a gesture misfires.
 
 ## Production deployment
+
 
 The Vite dev proxy only runs in development. For production you must:
 

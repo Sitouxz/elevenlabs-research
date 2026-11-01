@@ -1,4 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import {
+    checkPromptSafety,
+    getModerationRefusalMessage,
+} from "../utils/contentModeration";
 
 // ---------------------------------------------------------------------------
 // Replicate media (image + video) generation hook
@@ -12,6 +16,46 @@ import { useState, useCallback, useRef, useEffect } from "react";
 //   POST {N8N_IMAGE_WEBHOOK} - creates image prediction and waits for result
 //   POST {N8N_VIDEO_WEBHOOK} - creates video prediction and waits for result
 // ---------------------------------------------------------------------------
+
+// Socket.IO v4 (EIO=4) endpoint — sid is session-specific, so omit it and let
+// the server assign one on each connection.
+const XR_WS_URL = "wss://xr-api.fxwebapps.com/socket.io/?EIO=4&transport=websocket";
+
+// Sends two Socket.IO events over a short-lived connection:
+//   emit("image_url", url)
+//   emit("message", "image generated")
+// Follows Engine.IO v4 framing: "0"=open, "2"=ping→"3"pong, "40"=SIO connect, "42"=SIO event.
+function sendToXR(url: string) {
+    try {
+        const ws = new WebSocket(XR_WS_URL);
+        let sioConnected = false;
+
+        ws.addEventListener("message", ({ data }) => {
+            if (typeof data !== "string") return;
+            const eioType = data[0];
+
+            if (eioType === "0") {
+                // Engine.IO open → connect to Socket.IO default namespace
+                ws.send("40");
+            } else if (eioType === "2") {
+                // Engine.IO ping → pong
+                ws.send("3");
+            } else if (eioType === "4" && data[1] === "0" && !sioConnected) {
+                // Socket.IO namespace connected → emit events then close
+                sioConnected = true;
+                ws.send(`42["image_url",${JSON.stringify(url)}]`);
+                ws.send(`42["message",${JSON.stringify(url)}]`);
+                setTimeout(() => ws.close(), 200);
+            }
+        });
+
+        ws.addEventListener("error", (e) => {
+            console.warn("[XR-WS] send error", e);
+        });
+    } catch (err) {
+        console.warn("[XR-WS] could not open socket", err);
+    }
+}
 
 export type MediaType = "image" | "video";
 
@@ -109,6 +153,20 @@ export const useImageGeneration = () => {
         windowsRef.current = windows;
     }, [windows]);
 
+    // Track the most recently generated image URL so the AI can reference it
+    // when the user asks to edit or iterate on a previous generation.
+    const lastImageUrlRef = useRef<string | null>(null);
+
+    // Track when the last image completed so we can detect conversational edits.
+    // If the user asks for another image shortly after seeing the result, it's
+    // almost certainly an edit / iteration request.
+    const lastImageTimeRef = useRef<number>(0);
+
+    // The prompt used for the last generated image. Paired with the new
+    // prompt's keywords to tell "edit the same subject" apart from "generate
+    // something completely different" (see soundsLikeSameSubject in App.tsx).
+    const lastPromptRef = useRef<string>("");
+
     // -----------------------------------------------------------------------
     // Internal: update a single window by id
     // -----------------------------------------------------------------------
@@ -153,12 +211,23 @@ export const useImageGeneration = () => {
                     completedAt: Date.now(),
                 });
 
+                const win = windowsRef.current.find((w) => w.id === windowId);
+
+                // Remember the last generated image (URL + prompt + timestamp)
+                // for reference-based iteration (e.g. "make it turn left").
+                // Only images are useful as a style/edit reference — videos
+                // don't apply here.
+                if (win?.mediaType === "image") {
+                    lastImageUrlRef.current = url;
+                    lastImageTimeRef.current = Date.now();
+                    lastPromptRef.current = win.prompt;
+                }
+
+                sendToXR(url);
+
                 // Push to history (latest first). Don't dedupe by URL — same
                 // prompt twice creates two distinct items.
                 setHistory((prev) => {
-                    const win = windowsRef.current.find(
-                        (w) => w.id === windowId
-                    );
                     const item: ImageHistoryItem = {
                         id: windowId,
                         mediaType: win?.mediaType || "image",
@@ -186,9 +255,19 @@ export const useImageGeneration = () => {
     // Public: kick off a new generation. Returns the windowId.
     // -----------------------------------------------------------------------
     const generate = useCallback(
-        (prompt: string, mediaType: MediaType = "image"): string => {
+        (
+            prompt: string,
+            mediaType: MediaType = "image",
+            referenceImage?: string,
+        ): string => {
             const trimmed = prompt.trim();
             if (!trimmed) return "";
+
+            const moderation = checkPromptSafety(trimmed);
+            if (moderation.blocked) {
+                setError(getModerationRefusalMessage(moderation));
+                return "";
+            }
 
             const id =
                 typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -227,7 +306,12 @@ export const useImageGeneration = () => {
                             body: JSON.stringify({
                                 owner,
                                 model: name,
-                                input: { prompt: trimmed },
+                                input: {
+                                    prompt: trimmed,
+                                    ...(referenceImage
+                                        ? { image: referenceImage }
+                                        : {}),
+                                },
                             }),
                         }
                     );
@@ -347,6 +431,9 @@ export const useImageGeneration = () => {
         closeWindow,
         focusWindow,
         updateWindowPosition,
+        lastImageUrlRef,
+        lastImageTimeRef,
+        lastPromptRef,
         reopenFromHistory,
         clearHistory,
     };

@@ -4,6 +4,7 @@ import type { ImageWindow as ImageWindowType } from "../hooks/useImageGeneration
 
 interface ImageWindowManagerProps {
     windows: ImageWindowType[];
+    visible?: boolean;
     onClose: (id: string) => void;
     onFocus: (id: string) => void;
     onPositionChange: (
@@ -14,10 +15,13 @@ interface ImageWindowManagerProps {
 
 export const ImageWindowManager = ({
     windows,
+    visible = true,
     onClose,
     onFocus,
     onPositionChange,
 }: ImageWindowManagerProps) => {
+    if (!visible) return null;
+
     return (
         <div
             // Fixed full-screen overlay layer for windows. pointer-events:none
